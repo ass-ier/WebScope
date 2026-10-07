@@ -36,7 +36,8 @@ require reauthorization and target revalidation.
 
 ## API usage
 
-The interactive OpenAPI docs are at `http://127.0.0.1:8765/docs`. Writes require
+The generated OpenAPI schema is at `http://127.0.0.1:8765/openapi.json`. CDN-backed
+Swagger/ReDoc pages are disabled so the workstation remains offline-capable. Writes require
 both `Content-Type: application/json` and `X-WebScope-Request: workstation`.
 GET requests do not trigger collection.
 

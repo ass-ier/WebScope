@@ -158,6 +158,7 @@ async def collect(db, assessment, checks=None, transport=None, resolver=None):
     db.commit()
     run = NetworkRun(db, assessment.id, scope, transport=transport, resolver=resolver)
     initial_evidence_ids = {e.id for e in rows(db, m.Evidence, assessment.id)}
+    completed = False
     try:
         if checks is None:
             if scope.config.dns:
@@ -187,7 +188,7 @@ async def collect(db, assessment, checks=None, transport=None, resolver=None):
                 {"safe_paths": scope.config.safe_paths, "cors_probe": bool(checks.cors_origin)},
             )
         seen = set()
-        while queue and run.count < scope.config.max_requests:
+        while queue and not run.exhausted:
             url, depth, method = queue.pop(0)
             if (url, method) in seen:
                 continue
@@ -213,9 +214,8 @@ async def collect(db, assessment, checks=None, transport=None, resolver=None):
                         if item.details.get("kind") != "script" or scope.config.javascript:
                             queue.append((item.url, depth + 1, "GET"))
         if queue:
-            run.log(
-                "BUDGET_EXHAUSTED", scope.target, "Discovery stopped at the shared execution request limit"
-            )
+            code = "BUDGET_EXHAUSTED" if run.count >= scope.config.max_requests else "RUN_TIMEOUT"
+            run.log(code, scope.target, "Discovery stopped at the shared execution request or duration limit")
         for host in {urlsplit(scope.target).hostname, *run.addresses}:
             host_row = db.scalar(
                 select(m.Host).where(m.Host.assessment_id == assessment.id, m.Host.hostname == host)
@@ -255,17 +255,17 @@ async def collect(db, assessment, checks=None, transport=None, resolver=None):
             },
         )
         db.commit()
+        completed = True
         return assessment
-    except BaseException:
-        # Preserve the audit on cancellation/failure, then propagate rather than returning success.
-        db.rollback()
-        assessment = db.get(m.Assessment, assessment.id)
-        assessment.status = "FAILED"
-        event(
-            db,
-            assessment.id,
-            "EXECUTION_FAILED",
-            "Execution interrupted by an unexpected error; no success claimed",
-        )
-        db.commit()
-        raise
+    finally:
+        if not completed:
+            db.rollback()
+            assessment = db.get(m.Assessment, assessment.id)
+            assessment.status = "FAILED"
+            event(
+                db,
+                assessment.id,
+                "EXECUTION_FAILED",
+                "Execution interrupted by an unexpected error; no success claimed",
+            )
+            db.commit()

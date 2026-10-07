@@ -79,7 +79,7 @@ async def test_redirects_share_budget_and_rate(db, make_assessment):
     run = NetworkRun(db, item.id, scope_for(db, item), httpx.MockTransport(handler))
     await run.request("http://127.0.0.1:9998/")
     assert len(times) == 3 and run.count == 3
-    assert all(b - a >= 0.095 for a, b in zip(times, times[1:]))
+    assert all(b - a >= 0.1 for a, b in zip(times, times[1:]))
     assert any(e.type == "BUDGET_EXHAUSTED" for e in rows(db, m.Evidence, item.id))
 
 

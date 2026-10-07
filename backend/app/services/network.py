@@ -29,12 +29,22 @@ class NetworkRun:
         self.last_send = 0.0
         self.lock = asyncio.Lock()
         self.addresses = {}
+        self.limit_reached = False
 
     def time_limit(self):
         remaining = self.config.max_duration_seconds - (time.monotonic() - self.started)
         if remaining <= 0:
+            self.limit_reached = True
             raise PolicyError("RUN_TIMEOUT", "Execution duration limit reached")
         return min(self.config.timeout_seconds, remaining)
+
+    @property
+    def exhausted(self):
+        return (
+            self.limit_reached
+            or self.count >= self.config.max_requests
+            or time.monotonic() - self.started >= self.config.max_duration_seconds
+        )
 
     def log(self, code, url, message):
         ev = evidence(
@@ -46,13 +56,21 @@ class NetworkRun:
         self.db.commit()
         return ev
 
+    async def operation(self, awaitable):
+        try:
+            return await awaitable
+        finally:
+            self.last_send = time.monotonic()
+
     async def reserve(self, url, kind):
         self.scope.network_allowed(url)
         async with self.lock:
             if self.count >= self.config.max_requests:
+                self.limit_reached = True
                 raise PolicyError("BUDGET_EXHAUSTED", "Shared network request budget exhausted")
             wait = max(0, 1 / self.config.rate_per_second - (time.monotonic() - self.last_send))
             if time.monotonic() - self.started + wait >= self.config.max_duration_seconds:
+                self.limit_reached = True
                 raise PolicyError("RUN_TIMEOUT", "Execution duration limit reached")
             if wait:
                 await asyncio.sleep(wait)
@@ -88,14 +106,16 @@ class NetworkRun:
             await self.reserve(url, "ADDRESS_RESOLUTION")
             async with asyncio.timeout(self.time_limit()):
                 if self.resolver:
-                    values = await self.resolver(host)
+                    values = await self.operation(self.resolver(host))
                 else:
                     values = [
                         v[4][0]
-                        for v in await asyncio.get_running_loop().getaddrinfo(
-                            host,
-                            parsed.port or (443 if parsed.scheme == "https" else 80),
-                            type=socket.SOCK_STREAM,
+                        for v in await self.operation(
+                            asyncio.get_running_loop().getaddrinfo(
+                                host,
+                                parsed.port or (443 if parsed.scheme == "https" else 80),
+                                type=socket.SOCK_STREAM,
+                            )
                         )
                     ]
             if not values:
@@ -228,7 +248,6 @@ class NetworkRun:
                                 "truncated": truncated,
                                 "hop": hop,
                             }
-                            cookies = response.headers.get_list("set-cookie")
                 res_ev = evidence(
                     self.db,
                     self.assessment_id,
@@ -276,7 +295,6 @@ class NetworkRun:
                         return tx
                     current = destination
                     continue
-                tx._cookies = [redact.cookie_header(v) for v in cookies]
                 return tx
             except (httpx.HTTPError, TimeoutError, OSError, ValueError, zlib.error, PolicyError) as exc:
                 code = (
@@ -308,4 +326,6 @@ class NetworkRun:
                 self.db.flush()
                 self.db.commit()
                 return None
+            finally:
+                self.last_send = time.monotonic()
         return None

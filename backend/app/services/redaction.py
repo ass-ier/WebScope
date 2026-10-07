@@ -51,7 +51,16 @@ def text(value: str) -> str:
     )
     value = re.sub(r"(?im)^(set-cookie\s*:)\s*(.*)$", lambda m: f"{m[1]} {cookie_header(m[2])}", value)
     value = re.sub(r"https?://[^\s<>\"']+", lambda m: url(m[0]), value) if "://" in value else value
-    value = ASSIGNMENT.sub(lambda m: m[1] + f'"{MASK}"', value)
+    value = ASSIGNMENT.sub(
+        lambda m: (
+            m[0]
+            if re.match(
+                r"""(?i)["']?(?:access-control-allow-credentials|allow_credentials)["']?\s*[:=]""", m[1]
+            )
+            else m[1] + f'"{MASK}"'
+        ),
+        value,
+    )
     value = re.sub(
         r"""(?is)(<input\b[^>]*\bvalue\s*=\s*)(?:"[^"]*"|'[^']*'|[^\s>]+)""",
         lambda m: m[1] + f'"{MASK}"',
@@ -72,20 +81,68 @@ def text(value: str) -> str:
     return value
 
 
-def clean(value):
+def clean(value, secret_context=False):
     if isinstance(value, dict):
+        named_parameter = sensitive(str(value.get("name", ""))) and bool(
+            {"value", "default", "example", "examples", "schema", "in"}.intersection(value)
+        )
+        secret_context = secret_context or named_parameter or value.get("type") == "password"
         result = {}
         for key, item in value.items():
             key = str(key)
             if key.lower() == "set-cookie" and isinstance(item, str):
                 result[key] = cookie_header(item)
-            elif sensitive(key):
+            elif secret_context and key.lower() in ("value", "default", "example", "examples", "enum"):
                 result[key] = MASK
+            elif (
+                secret_context
+                and isinstance(item, (str, int, float, bool))
+                and key.lower()
+                not in (
+                    "name",
+                    "type",
+                    "in",
+                    "format",
+                    "description",
+                    "title",
+                    "required",
+                    "nullable",
+                    "deprecated",
+                    "readonly",
+                    "writeonly",
+                    "minimum",
+                    "maximum",
+                    "minlength",
+                    "maxlength",
+                )
+            ):
+                result[key] = MASK
+            elif sensitive(key):
+                # Keep non-secret schema declarations and empty security-requirement scopes useful.
+                if item == []:
+                    result[key] = []
+                elif isinstance(item, dict) and item.get("type") in (
+                    "string",
+                    "number",
+                    "integer",
+                    "boolean",
+                    "object",
+                    "array",
+                    "null",
+                    "apiKey",
+                    "http",
+                    "oauth2",
+                    "openIdConnect",
+                    "mutualTLS",
+                ):
+                    result[key] = clean(item, secret_context=True)
+                else:
+                    result[key] = MASK
             else:
-                result[key] = clean(item)
+                result[key] = clean(item, secret_context=secret_context)
         return result
     if isinstance(value, (list, tuple)):
-        return [clean(item) for item in value]
+        return [clean(item, secret_context=secret_context) for item in value]
     if isinstance(value, str):
         return text(value)
     return value

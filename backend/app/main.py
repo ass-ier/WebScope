@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy import delete, select
 
 from app import models as m
@@ -57,7 +58,7 @@ def create_app(engine=None):
         yield
         engine.dispose()
 
-    app = FastAPI(title="WebScope", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="WebScope", version="1.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.engine = engine
     app.state.sessions = factory
 
@@ -120,12 +121,8 @@ def create_app(engine=None):
 
     def database():
         with factory() as db:
-            try:
-                yield db
-                db.commit()
-            except BaseException:
-                db.rollback()
-                raise
+            yield db
+            db.commit()
 
     def get(db, model, id):
         item = db.get(model, id)
@@ -582,6 +579,12 @@ def create_app(engine=None):
     def rules(db=Depends(database)):
         return [record(r) for r in db.scalars(select(m.DetectionRule))]
 
+    @app.api_route(
+        "/api/{unmatched:path}", methods=["GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"]
+    )
+    def missing_api(unmatched: str):
+        raise HTTPException(404, "Unknown API route")
+
     frontend = Path(os.environ.get("WEBSCOPE_FRONTEND_DIR", "../frontend/dist"))
     if frontend.is_dir():
 
@@ -589,7 +592,7 @@ def create_app(engine=None):
             async def get_response(self, path, scope):
                 try:
                     return await super().get_response(path, scope)
-                except HTTPException as exc:
+                except StarletteHTTPException as exc:
                     if exc.status_code != 404:
                         raise
                     return await super().get_response("index.html", scope)

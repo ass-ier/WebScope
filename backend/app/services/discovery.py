@@ -281,19 +281,34 @@ def import_openapi(db, assessment_id, scope, document):
         "Imported OpenAPI specification (inventory only)",
         {"document": resolved, "local_references": refs},
     )
-    servers = resolved.get("servers") or [{"url": scope.target}]
-    if not isinstance(servers, list) or not isinstance(servers[0], dict):
-        raise ValueError("Invalid OpenAPI servers")
-    base = urljoin(scope.target, servers[0].get("url", scope.target))
-    if "{" in base:
-        server = servers[0]
-        for key, value in server.get("variables", {}).items():
-            base = base.replace("{" + key + "}", str(value.get("default", "")))
-    canonical_url(base)
+
+    def server_bases(servers):
+        if not isinstance(servers, list) or len(servers) > 20:
+            raise ValueError("OpenAPI servers must be an array of at most 20 entries")
+        bases = []
+        for server in servers or [{"url": scope.target}]:
+            if not isinstance(server, dict) or not isinstance(server.get("url"), str):
+                raise ValueError("Each OpenAPI server requires a URL string")
+            variables = server.get("variables", {})
+            if not isinstance(variables, dict):
+                raise ValueError("OpenAPI server variables must be an object")
+            base = urljoin(scope.target, server["url"])
+            for key, value in variables.items():
+                if not isinstance(value, dict) or not isinstance(value.get("default"), (str, int, float)):
+                    raise ValueError("OpenAPI server variables require scalar defaults")
+                base = base.replace("{" + key + "}", str(value["default"]))
+            if "{" in base or "}" in base or urlsplit(base).query or urlsplit(base).fragment:
+                raise ValueError("Unresolved or query-bearing OpenAPI server URLs are unsupported")
+            bases.append(canonical_url(base))
+        return bases
+
+    default_servers = resolved.get("servers", [])
+    server_bases(default_servers)
+    schemes = resolved.get("components", {}).get("securitySchemes", {})
+    if not isinstance(schemes, dict):
+        raise ValueError("OpenAPI securitySchemes must be an object")
     count = 0
     for path, operations in resolved["paths"].items():
-        if count >= 1000:
-            raise ValueError("OpenAPI import is limited to 1000 operations")
         if not isinstance(path, str) or not path.startswith("/") or not isinstance(operations, dict):
             raise ValueError("Invalid OpenAPI path item")
         for method, operation in operations.items():
@@ -315,29 +330,39 @@ def import_openapi(db, assessment_id, scope, document):
             params = inherited_params + operation_params
             if not all(isinstance(p, dict) for p in params):
                 raise ValueError("Each OpenAPI parameter must be an object")
-            item = endpoint(
-                db,
-                assessment_id,
-                scope,
-                base.rstrip("/") + path,
-                "OPENAPI",
-                ev.id,
-                method.upper(),
-                params,
-                {
-                    "kind": "api",
-                    "operation_id": operation.get("operationId"),
-                    "security": security,
-                    "security_schemes": resolved.get("components", {}).get("securitySchemes", {}),
-                    "responses": operation.get("responses", {}),
-                    "request_body": operation.get("requestBody"),
-                    "execution": "NEVER",
-                    "source_url": scope.target,
-                },
-            )
-            if item:
-                item.authentication = "DECLARED_REQUIRED" if security else "NONE_DECLARED"
-                count += 1
+            if not all(isinstance(s, dict) for s in security) or not isinstance(
+                operation.get("responses", {}), dict
+            ):
+                raise ValueError("Invalid OpenAPI security requirement or response object")
+            servers = operation.get("servers", operations.get("servers", default_servers))
+            for base in server_bases(servers):
+                if count >= 1000:
+                    raise ValueError("OpenAPI import is limited to 1000 endpoint operations")
+                item = endpoint(
+                    db,
+                    assessment_id,
+                    scope,
+                    base.rstrip("/") + path,
+                    "OPENAPI",
+                    ev.id,
+                    method.upper(),
+                    params,
+                    {
+                        "kind": "api",
+                        "operation_id": operation.get("operationId"),
+                        "security": security,
+                        "security_schemes": schemes,
+                        "responses": operation.get("responses", {}),
+                        "request_body": operation.get("requestBody"),
+                        "execution": "NEVER",
+                        "source_url": scope.target,
+                    },
+                )
+                if item:
+                    item.authentication = (
+                        "DECLARED_REQUIRED" if security and {} not in security else "NONE_DECLARED"
+                    )
+                    count += 1
     event(
         db,
         assessment_id,

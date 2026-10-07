@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app import models as m
 from app.services.analysis import risk
-from app.services.assessments import overview
+from app.services.assessments import overview, target_for
 from app.services.graph import graph
 from app.services.store import event, record, rows
 
@@ -37,6 +37,8 @@ DATASETS = {
 
 def snapshot(db, assessment):
     data = {"schema_version": "1.0", "generated_at": m.now(), "assessment": overview(db, assessment)}
+    data["target_record"] = record(target_for(db, assessment.id))
+    data["scope_rule_records"] = [record(r) for r in rows(db, m.ScopeRule, assessment.id)]
     data.update(
         {name: [record(r) for r in rows(db, model, assessment.id)] for name, model in DATASETS.items()}
     )

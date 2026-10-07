@@ -48,6 +48,9 @@ def test_cookie_attributes_survive_duplicate_header_redaction():
     assert parse_cookie(first)[1]["secure"] is True
     assert parse_cookie(first)[1]["samesite"] == "Lax"
     assert parse_cookie(second)[1]["expires"] == "Wed, 09 Jun 2030 10:18:14 GMT"
+    assert (
+        redaction.text("access-control-allow-credentials: true") == "access-control-allow-credentials: true"
+    )
 
 
 @pytest.mark.parametrize(
@@ -145,3 +148,54 @@ def test_openapi_recursive_refs_kept_and_bad_refs_rejected(db, make_assessment):
         with pytest.raises(ValueError):
             import_openapi(db, item.id, scope, {"openapi": "3.0.0", "paths": {}, "x-ref": {"$ref": ref}})
     json.dumps(recursive)
+
+
+def test_parameter_examples_redacted_without_erasing_security_schema():
+    data = redaction.clean(
+        {
+            "parameters": [
+                {
+                    "name": "api_key",
+                    "example": "SCHEMA_SECRET",
+                    "schema": {"type": "string", "default": "SCHEMA_SECRET"},
+                }
+            ],
+            "security": [{"ApiKeyAuth": []}],
+            "security_schemes": {"ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-API-Key"}},
+            "token": {"type": "string", "value": "SCHEMA_SECRET", "data": "SCHEMA_SECRET"},
+        }
+    )
+    assert "SCHEMA_SECRET" not in str(data)
+    assert data["security"] == [{"ApiKeyAuth": []}]
+    assert data["security_schemes"]["ApiKeyAuth"]["type"] == "apiKey"
+    assert data["parameters"][0]["schema"]["type"] == "string"
+
+
+def test_openapi_multiple_servers_variables_and_operation_override(db, make_assessment):
+    item = make_assessment()
+    document = {
+        "openapi": "3.1.0",
+        "servers": [
+            {"url": "http://127.0.0.1:9998/{base}", "variables": {"base": {"default": "v1"}}},
+            {"url": "https://external.invalid/v2"},
+        ],
+        "security": [{"ApiKeyAuth": []}],
+        "components": {
+            "securitySchemes": {"ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-API-Key"}}
+        },
+        "paths": {
+            "/items": {"get": {"responses": {}}},
+            "/status": {"get": {"servers": [{"url": "/override"}], "security": [{}], "responses": {}}},
+        },
+    }
+    result = import_openapi(db, item.id, scope_for(db, item), document)
+    assert result["imported"] == 3
+    inventory = rows(db, m.Endpoint, item.id)
+    assert {e.url for e in inventory} == {
+        "http://127.0.0.1:9998/v1/items",
+        "https://external.invalid/v2/items",
+        "http://127.0.0.1:9998/override/status",
+    }
+    assert any(not e.in_scope for e in inventory)
+    assert inventory[0].details["security"] == [{"ApiKeyAuth": []}]
+    assert inventory[-1].authentication == "NONE_DECLARED"

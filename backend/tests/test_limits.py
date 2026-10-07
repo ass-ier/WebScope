@@ -96,7 +96,7 @@ async def test_budget_covers_redirects_robots_sitemap_and_resources(db, make_ass
 
     await assessments.collect(db, item, transport=httpx.MockTransport(handler))
     assert [p for p, _ in actual_sends] == ["/", "/landing", "/robots.txt", "/sitemap.xml", "/first"]
-    assert all(b[1] - a[1] >= 0.095 for a, b in zip(actual_sends, actual_sends[1:]))
+    assert all(b[1] - a[1] >= 0.1 for a, b in zip(actual_sends, actual_sends[1:]))
     assert any(e.type == "BUDGET_EXHAUSTED" for e in rows(db, m.Evidence, item.id))
 
 
@@ -119,6 +119,8 @@ async def test_run_duration_and_authority_headers_stop_before_send(db, make_asse
         ("security", {}),
         ("paths", []),
         ("servers", "http://evil.test"),
+        ("servers", [{"url": 42}]),
+        ("servers", [{"url": "http://{host}", "variables": {"host": []}}]),
     ],
 )
 def test_openapi_malformed_shapes_do_not_crash(client, payload, field, value):
@@ -157,3 +159,59 @@ async def test_explicit_http_https_and_methods_inventory(db, make_assessment):
         e.details.get("allowed_methods_observed") == "GET, HEAD, OPTIONS, POST"
         for e in rows(db, m.Endpoint, item.id)
     )
+
+
+def test_production_spa_deep_links_and_unknown_api(engine, tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+
+    (tmp_path / "index.html").write_text("<html><body>WebScope fixture shell</body></html>")
+    monkeypatch.setenv("WEBSCOPE_FRONTEND_DIR", str(tmp_path))
+    with TestClient(create_app(engine)) as client:
+        assert "WebScope fixture shell" in client.get("/assessments/new").text
+        assert client.get("/api/not-a-real-route").status_code == 404
+
+
+async def test_unexpected_parser_failure_retains_attempt_and_source_evidence(
+    db, make_assessment, monkeypatch
+):
+    item = make_assessment()
+
+    def fail_parser(*args):
+        raise RuntimeError("Synthetic parser failure")
+
+    monkeypatch.setattr("app.services.assessments.harvest", fail_parser)
+    with pytest.raises(RuntimeError, match="Synthetic parser"):
+        await assessments.collect(
+            db, item, transport=httpx.MockTransport(lambda r: httpx.Response(200, text="fixture"))
+        )
+    assert db.get(m.Assessment, item.id).status == "FAILED"
+    assert any(e.type == "HTTP_RESPONSE" for e in rows(db, m.Evidence, item.id))
+    assert any(e.event == "NETWORK_ATTEMPT" for e in rows(db, m.TimelineEvent, item.id))
+    assert any(e.event == "EXECUTION_FAILED" for e in rows(db, m.TimelineEvent, item.id))
+
+
+async def test_variable_persistence_delay_cannot_compress_actual_send_spacing(
+    db, make_assessment, monkeypatch
+):
+    item = make_assessment()
+    original_commit = db.commit
+    commits = 0
+    sends = []
+
+    def variable_commit():
+        nonlocal commits
+        commits += 1
+        if commits == 2:
+            time.sleep(0.05)
+        original_commit()
+
+    def handler(request):
+        sends.append(time.monotonic())
+        return httpx.Response(200, text="fixture")
+
+    monkeypatch.setattr(db, "commit", variable_commit)
+    run = NetworkRun(db, item.id, scope_for(db, item), httpx.MockTransport(handler))
+    await run.request("http://127.0.0.1:9998/first")
+    await run.request("http://127.0.0.1:9998/second")
+    assert sends[1] - sends[0] >= 0.1

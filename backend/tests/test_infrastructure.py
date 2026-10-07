@@ -179,3 +179,53 @@ async def test_passive_dns_tls_cannot_network(db, make_assessment):
     await collect_tls(run, connector)
     assert run.count == 0
     assert all(e.type == "PASSIVE_MODE" for e in rows(db, m.Evidence, item.id))
+
+
+async def test_dns_txt_redacted_in_observation_table_not_only_api(db, make_assessment):
+    item = make_assessment("http://allowed.test")
+
+    class Record:
+        def to_text(self):
+            return '"API_KEY=DNS_SENTINEL"'
+
+    class Answer(list):
+        rrset = type("RRSet", (), {"ttl": 30})()
+        nameserver = "127.0.0.1"
+
+    class Resolver:
+        nameservers = ["127.0.0.1"]
+
+        async def resolve(self, host, kind, **kwargs):
+            return Answer([Record()]) if kind == "TXT" else Answer([])
+
+    await collect_dns(NetworkRun(db, item.id, scope_for(db, item)), Resolver())
+    assert "DNS_SENTINEL" not in str([r.records for r in rows(db, m.DNSRecord, item.id)])
+    assert "DNS_SENTINEL" not in str([e.data for e in rows(db, m.Evidence, item.id)])
+
+
+async def test_weak_negotiated_protocol_and_hostname_rules_use_fixture_evidence(db, make_assessment):
+    item = make_assessment("https://mismatch.test")
+    _, cert = make_certificate()
+    der = cert.public_bytes(serialization.Encoding.DER)
+
+    async def resolver(host):
+        return ["127.0.0.1"]
+
+    def connector(address, port, host, timeout, verify):
+        if verify:
+            error = ssl.SSLCertVerificationError("hostname mismatch")
+            error.verify_message = "hostname mismatch"
+            raise error
+        return {
+            "leaf": der,
+            "chain": [der],
+            "chain_collection": "synthetic connector fixture",
+            "tls_version": "TLSv1.1",
+            "cipher": ["fixture", "TLSv1.1", 128],
+        }
+
+    await collect_tls(NetworkRun(db, item.id, scope_for(db, item), resolver=resolver), connector)
+    analyze(db, item)
+    found = rows(db, m.Finding, item.id)
+    assert {"WS-TLS-002", "WS-TLS-003", "WS-TLS-004"} <= {f.rule_id for f in found}
+    assert all(f.status == "NEW" and f.evidence_id for f in found)

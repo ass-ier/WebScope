@@ -37,6 +37,7 @@ def fingerprint(db, assessment_id, tx):
         ("Angular", "Frontend", r"ng-version\s*=", "HIGH"),
         ("WordPress", "CMS", r"/wp-content/", "MEDIUM"),
         ("jQuery", "JavaScript libraries", r"jquery(?:[-.][\d.]+)?(?:\.min)?\.js", "MEDIUM"),
+        ("Bootstrap", "Frontend", r"bootstrap(?:[-.][\d.]+)?(?:\.min)?\.(?:css|js)", "MEDIUM"),
         ("Google Analytics", "Analytics", r"(?:googletagmanager\.com|google-analytics\.com)", "MEDIUM"),
     ]
     for name, category, pattern, confidence in patterns:
@@ -58,6 +59,20 @@ def fingerprint(db, assessment_id, tx):
     ]:
         if marker in headers:
             observations.append((name, category, None, "MEDIUM", f"Response header {marker} is present"))
+    for name, marker, confidence in (
+        ("Laravel", "laravel_session=", "MEDIUM"),
+        ("Django indicator", "csrftoken=", "LOW"),
+    ):
+        if marker in headers.get("set-cookie", ""):
+            observations.append(
+                (
+                    name,
+                    "Backend",
+                    None,
+                    confidence,
+                    f"Cookie-name indicator {marker[:-1]}; not proof of framework identity",
+                )
+            )
     if re.search(r"(?:SQLSTATE|PostgreSQL|MySQL)", body):
         observations.append(
             (
@@ -70,10 +85,12 @@ def fingerprint(db, assessment_id, tx):
         )
     for name, category, version, confidence, rationale in observations:
         exists = db.scalar(
-            select(m.Technology).where(
+            select(m.Technology)
+            .join(m.Evidence, m.Evidence.id == m.Technology.evidence_id)
+            .where(
                 m.Technology.assessment_id == assessment_id,
                 m.Technology.name == name,
-                m.Technology.evidence_id == tx.evidence_id,
+                m.Evidence.data["source_evidence_id"].as_string() == tx.evidence_id,
             )
         )
         if exists:

@@ -63,6 +63,15 @@ def test_source_and_automated_facts_immutable_at_database_level(db, make_assessm
     db.expire_all()
     assert db.get(m.Finding, found.id).severity == "MEDIUM"
     assert db.get(m.Finding, found.id).analyst_severity == "HIGH"
+    for column, value in (
+        ("affected_asset", "http://different.invalid/"),
+        ("references", []),
+        ("created_at", "changed"),
+    ):
+        with pytest.raises(IntegrityError, match="immutable"):
+            db.execute(update(m.Finding).where(m.Finding.id == found.id).values(**{column: value}))
+            db.commit()
+        db.rollback()
 
 
 def test_case_cross_assessment_links_rejected(client, db, payload):

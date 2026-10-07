@@ -11,6 +11,7 @@ import dns.exception
 import dns.resolver
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
+from sqlalchemy import select
 
 from app import models as m
 from app.services.scope import PolicyError
@@ -34,7 +35,9 @@ async def collect_dns(run, resolver=None):
         try:
             await run.reserve(url, f"DNS_{kind}")
             async with asyncio.timeout(run.time_limit()):
-                answer = await resolver.resolve(host, kind, search=False, raise_on_no_answer=False)
+                answer = await run.operation(
+                    resolver.resolve(host, kind, search=False, raise_on_no_answer=False)
+                )
             records = [v.to_text() for v in answer] if answer.rrset else []
             ttl = answer.rrset.ttl if answer.rrset else None
             resolver_name = str(
@@ -51,6 +54,27 @@ async def collect_dns(run, resolver=None):
                 if any(marker in " ".join(records).lower() for marker in ("dev.", "staging.", "test."))
                 else "Records observed; unusual values alone are not vulnerabilities",
             }
+            previous = run.db.scalars(
+                select(m.DNSRecord)
+                .where(
+                    m.DNSRecord.assessment_id == run.assessment_id,
+                    m.DNSRecord.hostname == host,
+                    m.DNSRecord.record_type == kind,
+                )
+                .order_by(m.DNSRecord.created_at.desc())
+            ).first()
+            data["record_set_comparison"] = (
+                "changed since prior collection; rotation or timing may explain this"
+                if previous and sorted(previous.records) != sorted(records)
+                else "unchanged"
+                if previous
+                else "first observation"
+            )
+            if kind == "CNAME":
+                data["outside_scope_alias"] = any(
+                    record.rstrip(".").lower() not in run.scope.allowed for record in records
+                )
+                data["alias_policy"] = "Aliases do not authorize collection of their destination hostname"
             ev = evidence(run.db, run.assessment_id, "DNS_RESPONSE", url, f"DNS {kind} observation", data)
             run.db.add(
                 m.DNSRecord(
@@ -60,7 +84,7 @@ async def collect_dns(run, resolver=None):
                     record_type=kind,
                     ttl=ttl,
                     resolver=resolver_name,
-                    records=records,
+                    records=ev.data["records"],
                 )
             )
             event(
@@ -164,15 +188,19 @@ async def collect_tls(run, connector=handshake):
         await run.reserve(target, "TLS_VERIFIED_HANDSHAKE")
         verified, verification_error = True, None
         try:
-            result = await asyncio.to_thread(
-                connector, addresses[0], parts.port or 443, parts.hostname, run.time_limit(), True
+            result = await run.operation(
+                asyncio.to_thread(
+                    connector, addresses[0], parts.port or 443, parts.hostname, run.time_limit(), True
+                )
             )
         except ssl.SSLCertVerificationError as exc:
             verified, verification_error = False, exc.verify_message
             run.log("TLS_VERIFICATION_FAILED", target, f"Certificate validation failed: {verification_error}")
             await run.reserve(target, "TLS_CERTIFICATE_INSPECTION")
-            result = await asyncio.to_thread(
-                connector, addresses[0], parts.port or 443, parts.hostname, run.time_limit(), False
+            result = await run.operation(
+                asyncio.to_thread(
+                    connector, addresses[0], parts.port or 443, parts.hostname, run.time_limit(), False
+                )
             )
         details = certificate_details(result["leaf"], parts.hostname)
         details.update({k: v for k, v in result.items() if k not in ("leaf", "chain")})
@@ -194,7 +222,7 @@ async def collect_tls(run, connector=handshake):
         )
         run.db.add(
             m.TLSCertificate(
-                assessment_id=run.assessment_id, evidence_id=ev.id, hostname=parts.hostname, details=details
+                assessment_id=run.assessment_id, evidence_id=ev.id, hostname=parts.hostname, details=ev.data
             )
         )
         event(run.db, run.assessment_id, "TLS_ANALYZED", "TLS observation collected", {"evidence_id": ev.id})

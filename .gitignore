@@ -15,3 +15,5 @@ data/
 *.egg-info/
 .coverage
 htmlcov/
+.playwright-mcp/
+.impeccable/hook.cache.json

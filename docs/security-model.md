@@ -11,6 +11,8 @@ Scope or private-network-policy changes require explicit reauthorization.
 Every HTTP request, linked resource, redirect, explicit DNS query and TLS
 connection is routed through `NetworkRun`. Its execution budget, inter-attempt
 rate spacing, wall-clock duration and per-operation timeout are shared.
+Spacing is conservatively measured from completion of the prior operation, so
+request preparation or persistence overhead cannot compress actual send gaps.
 An OS address lookup counts as one operation; underlying resolver packet
 retries are managed by the OS. DNS record resolution has a bounded lifetime.
 The budget is per explicit execution, not a lifetime assessment allowance.
