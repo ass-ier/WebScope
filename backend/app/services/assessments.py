@@ -1,6 +1,6 @@
 from urllib.parse import urlsplit
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 
 from app import models as m
 from app.schemas import Configuration, ScopeInput
@@ -45,6 +45,16 @@ def save_scope(db, assessment_id, rules):
 
 
 def create(db, payload):
+    owner_id = db.info.get("owner_id")
+    deployment = db.info.get("deployment")
+    if owner_id and deployment:
+        count = db.scalar(
+            select(func.count()).select_from(m.Assessment).where(m.Assessment.owner_id == owner_id)
+        )
+        if count >= deployment.max_assessments:
+            raise ValueError(
+                f"Workspace assessment limit reached ({deployment.max_assessments}); archive and delete unused assessments"
+            )
     if payload.authorized and not payload.authorization_note.strip():
         raise ValueError("Explicit authorization requires a non-empty authorization statement")
     scope = Scope(payload.target, payload.scope, payload.config, payload.authorized)
@@ -54,6 +64,7 @@ def create(db, payload):
     for path in payload.config.safe_paths:
         scope.validate(scope.target.split("://")[0] + "://" + urlsplit(scope.target).netloc + path)
     item = m.Assessment(
+        owner_id=owner_id,
         name=redaction.text(payload.name),
         description=redaction.text(payload.description),
         config=payload.config.model_dump(),
@@ -133,6 +144,10 @@ def validate(db, assessment):
 
 
 async def collect(db, assessment, checks=None, transport=None, resolver=None):
+    if db.info.get("deployment") and not db.info["deployment"].network_enabled:
+        raise ValueError(
+            "Hosted workspaces are import-only. Collect authorized target data with the local workstation, then upload it."
+        )
     scope = scope_for(db, assessment)
     if (
         assessment.status not in ("READY", "COMPLETED", "FAILED")

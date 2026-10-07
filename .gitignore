@@ -17,3 +17,5 @@ data/
 htmlcov/
 .playwright-mcp/
 .impeccable/hook.cache.json
+.env
+.env.local

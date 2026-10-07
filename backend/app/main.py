@@ -1,5 +1,9 @@
 import os
 import base64
+import asyncio
+import contextlib
+import json
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -10,9 +14,11 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from app import models as m
 from app.db import database_url, make_engine, session_factory
+from app.deployment import Deployment
 from app.schemas import (
     AssessmentCreate,
     AssessmentUpdate,
@@ -20,6 +26,7 @@ from app.schemas import (
     CaseCreate,
     CaseUpdate,
     Configuration,
+    DataImport,
     EndpointCreate,
     FindingUpdate,
     NoteCreate,
@@ -29,6 +36,7 @@ from app.schemas import (
     SafeChecks,
 )
 from app.services import assessments, redaction, reporting
+from app.services import workspaces
 from app.services.analysis import analyze, risk, seed_rules
 from app.services.capture import capture
 from app.services.discovery import endpoint, import_openapi
@@ -37,14 +45,32 @@ from app.services.scope import Scope
 from app.services.store import add_note, event, evidence, record, rows
 
 
-def create_app(engine=None):
+def create_app(engine=None, deployment=None):
+    deployment = deployment or Deployment.from_env()
     testing = engine is not None
     engine = engine or make_engine(database_url())
     factory = session_factory(engine)
 
+    def clean_expired():
+        with factory() as db:
+            workspaces.cleanup(db)
+
+    async def cleanup_loop():
+        while True:
+            await asyncio.sleep(60)
+            try:
+                await asyncio.to_thread(clean_expired)
+            except OperationalError as exc:
+                if "locked" not in str(exc.orig).lower():
+                    raise
+                logging.getLogger("webscope.retention").warning(
+                    "Temporary workspace cleanup delayed by a busy database; retrying on the next interval."
+                )
+
     @asynccontextmanager
     async def lifespan(app):
         with factory() as db:
+            workspaces.cleanup(db, all_sessions=deployment.hosted)
             seed_rules(db)
             for item in db.scalars(select(m.Assessment).where(m.Assessment.status == "RUNNING")):
                 item.status = "FAILED"
@@ -55,12 +81,19 @@ def create_app(engine=None):
                     "Previous process stopped during execution; run was not resumed",
                 )
             db.commit()
-        yield
-        engine.dispose()
+        cleaner = asyncio.create_task(cleanup_loop())
+        try:
+            yield
+        finally:
+            cleaner.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await cleaner
+            engine.dispose()
 
     app = FastAPI(title="WebScope", version="1.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.engine = engine
     app.state.sessions = factory
+    app.state.deployment = deployment
 
     @app.middleware("http")
     async def local_boundary(request: Request, call_next):
@@ -69,15 +102,23 @@ def create_app(engine=None):
             if not request.headers.get("host", "").startswith("[")
             else "[::1]"
         )
-        allowed_hosts = {"127.0.0.1", "localhost", "[::1]"} | ({"testserver"} if testing else set())
+        allowed_hosts = (
+            set(deployment.allowed_hosts) if deployment.hosted else {"127.0.0.1", "localhost", "[::1]"}
+        )
+        if testing:
+            allowed_hosts.add("testserver")
         if host not in allowed_hosts:
             return JSONResponse({"detail": "Invalid local workstation Host"}, status_code=403)
         origin = request.headers.get("origin")
-        permitted_origins = {
-            f"{request.url.scheme}://{request.headers.get('host')}",
-            "http://127.0.0.1:5173",
-            "http://localhost:5173",
-        }
+        permitted_origins = (
+            {deployment.public_origin}
+            if deployment.hosted
+            else {
+                f"{request.url.scheme}://{request.headers.get('host')}",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+            }
+        )
         if origin and origin not in permitted_origins:
             return JSONResponse({"detail": "Cross-origin workstation access is prohibited"}, status_code=403)
         if request.headers.get("sec-fetch-site") == "cross-site":
@@ -95,6 +136,28 @@ def create_app(engine=None):
                     return JSONResponse({"detail": "Request body exceeds 2.1 MB limit"}, status_code=413)
                 chunks.append(chunk)
             request._body = b"".join(chunks)
+            if request.headers.get("content-type", "").split(";")[0] == "application/json":
+                try:
+                    json.loads(request._body or b"{}")
+                except (ValueError, RecursionError, UnicodeDecodeError):
+                    return JSONResponse(
+                        {"detail": "Malformed or excessively nested JSON request"}, status_code=400
+                    )
+        request.state.owner_id = None
+        token = request.cookies.get(workspaces.COOKIE)
+        if token:
+            with factory() as db:
+                workspace = workspaces.lookup(db, token)
+                request.state.owner_id = workspace.id if workspace else None
+        public = request.url.path in ("/api/health", "/api/session")
+        if request.url.path.startswith("/api/") and not public:
+            if (deployment.hosted or token) and not request.state.owner_id:
+                return JSONResponse(
+                    {
+                        "detail": "Your temporary workspace has expired or ended. Start a new session; expired data cannot be recovered."
+                    },
+                    status_code=401,
+                )
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -119,14 +182,28 @@ def create_app(engine=None):
             status_code=422,
         )
 
-    def database():
+    def database(request: Request):
         with factory() as db:
+            db.info["owner_id"] = request.state.owner_id
+            db.info["deployment"] = deployment
+            if request.method not in ("GET", "HEAD", "OPTIONS") and request.state.owner_id:
+                db.connection().exec_driver_sql("BEGIN IMMEDIATE")
             yield db
+            if request.method not in ("GET", "HEAD", "OPTIONS"):
+                workspaces.enforce_quota(db)
             db.commit()
 
     def get(db, model, id):
         item = db.get(model, id)
         if item is None:
+            raise HTTPException(404, "Record not found")
+        if model is m.Assessment:
+            assessment = item
+        elif hasattr(item, "assessment_id"):
+            assessment = db.get(m.Assessment, item.assessment_id)
+        else:
+            assessment = None
+        if assessment and assessment.owner_id != db.info.get("owner_id"):
             raise HTTPException(404, "Record not found")
         return item
 
@@ -193,27 +270,93 @@ def create_app(engine=None):
         return {
             "status": "ok",
             "version": "1.0.0",
-            "mode": "local-first",
+            "mode": deployment.mode,
             "external_intelligence": "not installed",
         }
 
+    @app.get("/api/session")
+    def session_status(request: Request, db=Depends(database, scope="function")):
+        workspace = workspaces.lookup(db, request.cookies.get(workspaces.COOKIE))
+        return workspaces.status(workspace, deployment)
+
+    @app.post("/api/session")
+    def start_session(request: Request, response: Response, db=Depends(database, scope="function")):
+        workspace = workspaces.lookup(db, request.cookies.get(workspaces.COOKIE))
+        if not workspace:
+            workspaces.cleanup(db)
+            db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            workspace, token = workspaces.begin(db, deployment)
+            db.info["owner_id"] = workspace.id
+            from app.services.imports import load_examples
+
+            load_examples(db)
+            response.set_cookie(
+                workspaces.COOKIE,
+                token,
+                httponly=True,
+                secure=deployment.secure_cookies,
+                samesite="lax",
+                path="/",
+            )
+        return workspaces.status(workspace, deployment)
+
+    @app.delete("/api/session", status_code=204)
+    def end_session(request: Request, db=Depends(database, scope="function")):
+        workspace = workspaces.lookup(db, request.cookies.get(workspaces.COOKIE))
+        if workspace:
+            workspaces.remove_workspace(db, workspace)
+        response = Response(status_code=204)
+        response.delete_cookie(
+            workspaces.COOKIE, path="/", secure=deployment.secure_cookies, httponly=True, samesite="lax"
+        )
+        return response
+
+    @app.post("/api/imports", response_model=AssessmentView, status_code=201)
+    def import_data(payload: DataImport, db=Depends(database, scope="function")):
+        if not db.info.get("owner_id"):
+            raise HTTPException(401, "Start a temporary session before uploading data.")
+        from app.services.imports import import_document
+
+        try:
+            item = import_document(db, payload)
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(
+                400,
+                "Upload contains invalid or duplicate records, or inconsistent relationships. Nothing was imported.",
+            ) from exc
+        workspaces.enforce_quota(db)
+        return assessments.overview(db, item)
+
+    @app.post("/api/examples", response_model=list[AssessmentView], status_code=201)
+    def examples(db=Depends(database, scope="function")):
+        if not db.info.get("owner_id"):
+            raise HTTPException(401, "Start a temporary session to load synthetic examples.")
+        from app.services.imports import load_examples
+
+        return [assessments.overview(db, item) for item in load_examples(db)]
+
     @app.get("/api/assessments", response_model=list[AssessmentView])
-    def list_assessments(db=Depends(database)):
+    def list_assessments(db=Depends(database, scope="function")):
         return [
             assessments.overview(db, item)
-            for item in db.scalars(select(m.Assessment).order_by(m.Assessment.created_at.desc()))
+            for item in db.scalars(
+                select(m.Assessment)
+                .where(m.Assessment.owner_id == db.info.get("owner_id"))
+                .order_by(m.Assessment.created_at.desc())
+            )
         ]
 
     @app.post("/api/assessments", response_model=AssessmentView, status_code=201)
-    def create_assessment(payload: AssessmentCreate, db=Depends(database)):
+    def create_assessment(payload: AssessmentCreate, db=Depends(database, scope="function")):
         return assessments.overview(db, assessments.create(db, payload))
 
     @app.get("/api/assessments/{id}", response_model=AssessmentView)
-    def get_assessment(id: str, db=Depends(database)):
+    def get_assessment(id: str, db=Depends(database, scope="function")):
         return assessments.overview(db, get(db, m.Assessment, id))
 
     @app.patch("/api/assessments/{id}", response_model=AssessmentView)
-    def update_assessment(id: str, payload: AssessmentUpdate, db=Depends(database)):
+    def update_assessment(id: str, payload: AssessmentUpdate, db=Depends(database, scope="function")):
         item = get(db, m.Assessment, id)
         if item.status == "RUNNING":
             raise HTTPException(409, "Cannot edit an executing assessment")
@@ -268,27 +411,19 @@ def create_app(engine=None):
         return assessments.overview(db, item)
 
     @app.delete("/api/assessments/{id}", status_code=204)
-    def delete_assessment(id: str, db=Depends(database)):
+    def delete_assessment(id: str, db=Depends(database, scope="function")):
         item = get(db, m.Assessment, id)
         if item.status != "ARCHIVED":
             raise HTTPException(409, "Archive an assessment before permanent deletion")
-        # Remove restrictive dependent links before cascading the owned assessment.
-        db.execute(delete(m.CaseFinding).where(m.CaseFinding.assessment_id == id))
-        db.execute(delete(m.CaseEvidence).where(m.CaseEvidence.assessment_id == id))
-        db.execute(delete(m.AnalystNote).where(m.AnalystNote.assessment_id == id))
-        db.execute(delete(m.FindingEvidence).where(m.FindingEvidence.assessment_id == id))
-        db.execute(delete(m.Finding).where(m.Finding.assessment_id == id))
-        db.execute(delete(m.EvidenceLink).where(m.EvidenceLink.assessment_id == id))
-        db.delete(item)
-        db.flush()
+        workspaces.remove_assessment(db, item)
         return Response(status_code=204)
 
     @app.post("/api/assessments/{id}/validate", response_model=AssessmentView)
-    def validate(id: str, db=Depends(database)):
+    def validate(id: str, db=Depends(database, scope="function")):
         return assessments.overview(db, assessments.validate(db, get(db, m.Assessment, id)))
 
     @app.post("/api/assessments/{id}/discover", response_model=AssessmentView)
-    async def discover(id: str, db=Depends(database)):
+    async def discover(id: str, db=Depends(database, scope="function")):
         item = await assessments.collect(db, editable(db, id))
         if item.status == "FAILED":
             raise HTTPException(
@@ -297,7 +432,7 @@ def create_app(engine=None):
         return assessments.overview(db, item)
 
     @app.post("/api/assessments/{id}/checks", response_model=AssessmentView)
-    async def checks(id: str, payload: SafeChecks, db=Depends(database)):
+    async def checks(id: str, payload: SafeChecks, db=Depends(database, scope="function")):
         item = await assessments.collect(db, editable(db, id), checks=payload)
         if item.status == "FAILED":
             raise HTTPException(
@@ -306,18 +441,18 @@ def create_app(engine=None):
         return assessments.overview(db, item)
 
     @app.post("/api/assessments/{id}/analyze", response_model=AssessmentView)
-    def analyze_assessment(id: str, db=Depends(database)):
+    def analyze_assessment(id: str, db=Depends(database, scope="function")):
         item = editable(db, id)
         analyze(db, item)
         return assessments.overview(db, item)
 
     @app.get("/api/assessments/{id}/graph")
-    def get_graph(id: str, db=Depends(database)):
+    def get_graph(id: str, db=Depends(database, scope="function")):
         get(db, m.Assessment, id)
         return graph(db, id)
 
     @app.get("/api/assessments/{id}/controls")
-    def get_controls(id: str, db=Depends(database)):
+    def get_controls(id: str, db=Depends(database, scope="function")):
         get(db, m.Assessment, id)
         return {
             "headers": [record(r) for r in rows(db, m.SecurityHeaderObservation, id)],
@@ -326,7 +461,7 @@ def create_app(engine=None):
         }
 
     @app.get("/api/assessments/{id}/{collection}", response_model=list[Record])
-    def get_collection(id: str, collection: str, db=Depends(database)):
+    def get_collection(id: str, collection: str, db=Depends(database, scope="function")):
         get(db, m.Assessment, id)
         datasets = {**reporting.DATASETS, "timeline": m.TimelineEvent}
         if collection not in datasets:
@@ -334,7 +469,7 @@ def create_app(engine=None):
         return [record(r) for r in rows(db, datasets[collection], id)]
 
     @app.post("/api/assessments/{id}/endpoints", response_model=Record, status_code=201)
-    def manual_endpoint(id: str, payload: EndpointCreate, db=Depends(database)):
+    def manual_endpoint(id: str, payload: EndpointCreate, db=Depends(database, scope="function")):
         item = editable(db, id)
         scope = assessments.scope_for(db, item)
         scope.validate(payload.url)
@@ -356,15 +491,15 @@ def create_app(engine=None):
         )
 
     @app.post("/api/assessments/{id}/openapi")
-    def openapi(id: str, payload: OpenAPIImport, db=Depends(database)):
+    def openapi(id: str, payload: OpenAPIImport, db=Depends(database, scope="function")):
         return import_openapi(db, id, assessments.scope_for(db, editable(db, id)), payload.document)
 
     @app.get("/api/findings/{id}", response_model=Record)
-    def get_finding(id: str, db=Depends(database)):
+    def get_finding(id: str, db=Depends(database, scope="function")):
         return finding_view(db, get(db, m.Finding, id))
 
     @app.patch("/api/findings/{id}", response_model=Record)
-    def update_finding(id: str, payload: FindingUpdate, db=Depends(database)):
+    def update_finding(id: str, payload: FindingUpdate, db=Depends(database, scope="function")):
         item = get(db, m.Finding, id)
         editable(db, item.assessment_id)
         changes = payload.model_dump(exclude_unset=True)
@@ -400,18 +535,18 @@ def create_app(engine=None):
         return finding_view(db, item)
 
     @app.post("/api/findings/{id}/notes", response_model=Record, status_code=201)
-    def finding_note(id: str, payload: NoteCreate, db=Depends(database)):
+    def finding_note(id: str, payload: NoteCreate, db=Depends(database, scope="function")):
         item = get(db, m.Finding, id)
         editable(db, item.assessment_id)
         return record(add_note(db, item.assessment_id, payload, finding_id=id))
 
     @app.post("/api/assessments/{id}/notes", response_model=Record, status_code=201)
-    def assessment_note(id: str, payload: NoteCreate, db=Depends(database)):
+    def assessment_note(id: str, payload: NoteCreate, db=Depends(database, scope="function")):
         editable(db, id)
         return record(add_note(db, id, payload))
 
     @app.get("/api/evidence/{id}", response_model=Record)
-    def get_evidence(id: str, db=Depends(database)):
+    def get_evidence(id: str, db=Depends(database, scope="function")):
         item = get(db, m.Evidence, id)
         related_ids = {id}
         for link in rows(db, m.EvidenceLink, item.assessment_id):
@@ -438,7 +573,7 @@ def create_app(engine=None):
         }
 
     @app.post("/api/evidence/{id}/capture", response_model=Record, status_code=201)
-    def capture_evidence(id: str, db=Depends(database)):
+    def capture_evidence(id: str, db=Depends(database, scope="function")):
         item = get(db, m.Evidence, id)
         editable(db, item.assessment_id)
         if item.type == "SCREENSHOT":
@@ -446,7 +581,7 @@ def create_app(engine=None):
         return record(capture(db, item))
 
     @app.get("/api/evidence/{id}/image")
-    def evidence_image(id: str, db=Depends(database)):
+    def evidence_image(id: str, db=Depends(database, scope="function")):
         item = get(db, m.Evidence, id)
         if item.type != "SCREENSHOT":
             raise HTTPException(404, "This evidence is not an image")
@@ -457,7 +592,7 @@ def create_app(engine=None):
         )
 
     @app.get("/api/transactions/{id}", response_model=Record)
-    def get_transaction(id: str, db=Depends(database)):
+    def get_transaction(id: str, db=Depends(database, scope="function")):
         item = get(db, m.HTTPTransaction, id)
         return {
             **record(item),
@@ -467,11 +602,18 @@ def create_app(engine=None):
         }
 
     @app.get("/api/cases", response_model=list[Record])
-    def list_cases(db=Depends(database)):
-        return [record(r) for r in db.scalars(select(m.Case))]
+    def list_cases(db=Depends(database, scope="function")):
+        return [
+            record(r)
+            for r in db.scalars(
+                select(m.Case)
+                .join(m.Assessment, m.Assessment.id == m.Case.assessment_id)
+                .where(m.Assessment.owner_id == db.info.get("owner_id"))
+            )
+        ]
 
     @app.post("/api/assessments/{id}/cases", response_model=Record, status_code=201)
-    def create_case(id: str, payload: CaseCreate, db=Depends(database)):
+    def create_case(id: str, payload: CaseCreate, db=Depends(database, scope="function")):
         assessment = editable(db, id)
         require_members(db, m.Finding, payload.finding_ids, id)
         require_members(db, m.Evidence, payload.evidence_ids, id)
@@ -494,11 +636,11 @@ def create_app(engine=None):
         return case_view(db, item)
 
     @app.get("/api/cases/{id}", response_model=Record)
-    def get_case(id: str, db=Depends(database)):
+    def get_case(id: str, db=Depends(database, scope="function")):
         return case_view(db, get(db, m.Case, id))
 
     @app.patch("/api/cases/{id}", response_model=Record)
-    def update_case(id: str, payload: CaseUpdate, db=Depends(database)):
+    def update_case(id: str, payload: CaseUpdate, db=Depends(database, scope="function")):
         item = get(db, m.Case, id)
         editable(db, item.assessment_id)
         changes = payload.model_dump(exclude_unset=True)
@@ -540,20 +682,20 @@ def create_app(engine=None):
         return case_view(db, item)
 
     @app.post("/api/cases/{id}/notes", response_model=Record, status_code=201)
-    def case_note(id: str, payload: NoteCreate, db=Depends(database)):
+    def case_note(id: str, payload: NoteCreate, db=Depends(database, scope="function")):
         item = get(db, m.Case, id)
         editable(db, item.assessment_id)
         return record(add_note(db, item.assessment_id, payload, case_id=id))
 
     @app.post("/api/assessments/{id}/reports", response_model=Record, status_code=201)
-    def report(id: str, payload: ReportCreate, db=Depends(database)):
+    def report(id: str, payload: ReportCreate, db=Depends(database, scope="function")):
         item = get(db, m.Assessment, id)
         if item.status == "RUNNING":
             raise HTTPException(409, "Wait for the active collection before generating a report")
         return record(reporting.generate(db, item, payload))
 
     @app.get("/api/reports/{id}/download")
-    def download(id: str, db=Depends(database)):
+    def download(id: str, db=Depends(database, scope="function")):
         item = get(db, m.Report, id)
         return Response(
             item.content,
@@ -562,12 +704,18 @@ def create_app(engine=None):
         )
 
     @app.get("/api/settings", response_model=Configuration)
-    def get_settings(db=Depends(database)):
+    def get_settings(db=Depends(database, scope="function")):
+        if db.info.get("owner_id"):
+            workspace = db.get(m.WorkspaceSession, db.info["owner_id"])
+            return Configuration(**workspace.settings)
         item = db.get(m.Settings, 1)
         return item.values if item else Configuration().model_dump()
 
     @app.patch("/api/settings", response_model=Configuration)
-    def update_settings(payload: Configuration, db=Depends(database)):
+    def update_settings(payload: Configuration, db=Depends(database, scope="function")):
+        if db.info.get("owner_id"):
+            db.get(m.WorkspaceSession, db.info["owner_id"]).settings = payload.model_dump()
+            return payload
         item = db.get(m.Settings, 1)
         if item:
             item.values = payload.model_dump()
@@ -576,8 +724,8 @@ def create_app(engine=None):
         return payload
 
     @app.get("/api/rules", response_model=list[Record])
-    def rules(db=Depends(database)):
-        return [record(r) for r in db.scalars(select(m.DetectionRule))]
+    def rules(db=Depends(database, scope="function")):
+        return [record(r) for r in workspaces.visible_rules(db)]
 
     @app.api_route(
         "/api/{unmatched:path}", methods=["GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"]

@@ -32,8 +32,17 @@ class Identity:
     created_at: Mapped[str] = mapped_column(String, default=now)
 
 
+class WorkspaceSession(Identity, Base):
+    __tablename__ = "workspace_sessions"
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[int] = mapped_column(Integer, index=True)
+    settings: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
 class Assessment(Identity, Base):
     __tablename__ = "assessments"
+    owner_id: Mapped[str | None] = mapped_column(ForeignKey("workspace_sessions.id"), index=True)
+    data_origin: Mapped[str] = mapped_column(String, default="COLLECTED", server_default="COLLECTED")
     name: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String, default="DRAFT")

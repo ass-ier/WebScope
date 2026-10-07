@@ -9,13 +9,13 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from sqlalchemy import select
 
 from app import models as m
 from app.services.analysis import risk
 from app.services.assessments import overview, target_for
 from app.services.graph import graph
 from app.services.store import event, record, rows
+from app.services.workspaces import visible_rules
 
 DATASETS = {
     "hosts": m.Host,
@@ -46,7 +46,7 @@ def snapshot(db, assessment):
     data["case_findings"] = [record(r) for r in rows(db, m.CaseFinding, assessment.id)]
     data["case_evidence"] = [record(r) for r in rows(db, m.CaseEvidence, assessment.id)]
     data["evidence_links"] = [record(r) for r in rows(db, m.EvidenceLink, assessment.id)]
-    data["rules"] = [record(r) for r in db.scalars(select(m.DetectionRule))]
+    data["rules"] = [record(r) for r in visible_rules(db, assessment.id)]
     data["risk"] = {item.id: risk(assessment, item) for item in rows(db, m.Finding, assessment.id)}
     data["graph"] = graph(db, assessment.id)
     return data

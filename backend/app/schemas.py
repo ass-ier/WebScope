@@ -12,6 +12,14 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class DataImport(StrictModel):
+    format: Literal["webscope", "har", "openapi"]
+    document: dict[str, Any]
+    name: str = Field(min_length=1, max_length=160)
+    target: str | None = Field(default=None, max_length=4096)
+    consent: bool = False
+
+
 class Configuration(StrictModel):
     mode: Literal["PASSIVE", "SAFE_HTTP"] = "PASSIVE"
     max_requests: int = Field(default=30, ge=1, le=200)

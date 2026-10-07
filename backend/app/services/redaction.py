@@ -9,7 +9,7 @@ SECRET_KEY = re.compile(
     re.I,
 )
 ASSIGNMENT = re.compile(
-    r"""((?:["']?[\w.-]*(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|credential|session[_-]?id)[\w.-]*["']?)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s<>,;&}]+)""",
+    r"""(?<![\w.-])((["']?[\w.-]+["']?)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s<>,;&}]+)""",
     re.I,
 )
 
@@ -26,13 +26,15 @@ def cookie_header(value: str) -> str:
     return f"{name}={MASK}" + "".join(f";{part}" for part in parts[1:])
 
 
-def url(value: str) -> str:
+def url(value: str, depth=0) -> str:
+    if depth >= 12:
+        return "[REDACTED NESTED URL]"
     try:
         parsed = urlsplit(value)
         host = parsed.netloc.rsplit("@", 1)[-1]
         query = urlencode(
             [
-                (k, MASK if sensitive(k) else text(v))
+                (k, MASK if sensitive(k) else text(v, depth + 1))
                 for k, v in parse_qsl(parsed.query, keep_blank_values=True)
             ]
         )
@@ -42,7 +44,7 @@ def url(value: str) -> str:
         return "[INVALID URL]"
 
 
-def text(value: str) -> str:
+def text(value: str, depth=0) -> str:
     value = re.sub(r"(?i)\b(Bearer|Basic)\s+[a-z0-9+/_.=-]+", rf"\1 {MASK}", value)
     value = re.sub(
         r"(?im)^((?:authorization|proxy-authorization|x-api-key|api-key|cookie)\s*:).*$",
@@ -50,14 +52,14 @@ def text(value: str) -> str:
         value,
     )
     value = re.sub(r"(?im)^(set-cookie\s*:)\s*(.*)$", lambda m: f"{m[1]} {cookie_header(m[2])}", value)
-    value = re.sub(r"https?://[^\s<>\"']+", lambda m: url(m[0]), value) if "://" in value else value
+    value = (
+        re.sub(r"https?://[^\s<>\"']+", lambda m: url(m[0], depth + 1), value) if "://" in value else value
+    )
     value = ASSIGNMENT.sub(
         lambda m: (
-            m[0]
-            if re.match(
-                r"""(?i)["']?(?:access-control-allow-credentials|allow_credentials)["']?\s*[:=]""", m[1]
-            )
-            else m[1] + f'"{MASK}"'
+            m[1] + f'"{MASK}"'
+            if sensitive(m[2].strip("\"'")) or depth >= 12
+            else m[1] + text(m[0][len(m[1]) :], depth + 1)
         ),
         value,
     )

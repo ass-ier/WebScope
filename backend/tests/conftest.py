@@ -38,6 +38,27 @@ def client(engine):
 
 
 @pytest.fixture
+def hosted(engine):
+    from app.deployment import Deployment
+
+    deployment = Deployment(
+        mode="hosted",
+        public_origin="https://webscope.test",
+        allowed_hosts=("webscope.test", "api.webscope.test"),
+    )
+    with TestClient(
+        create_app(engine, deployment),
+        base_url="https://webscope.test",
+        headers={
+            "Content-Type": "application/json",
+            "X-WebScope-Request": "workstation",
+            "Origin": "https://webscope.test",
+        },
+    ) as client:
+        yield client
+
+
+@pytest.fixture
 def make_assessment(db):
     def make(target="http://127.0.0.1:9998", **config):
         from urllib.parse import urlsplit
