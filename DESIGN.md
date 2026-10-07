@@ -95,6 +95,20 @@ components:
 
 # Design System: WebScope
 
+## Temporary-session extension
+
+The no-sign-in entry, persistent retention banner and Upload data page inherit
+the existing graphite surfaces, pale-blue actions, fields and error states.
+The entry explains deletion/expiry before the primary action. Retention stays
+visible during investigation and beside the upload form; End session uses a
+destructive confirmation explaining its effect on every tab.
+
+The entry uses 16px body copy for readable consent/retention information.
+The banner collapses from a desktop action row to stacked mobile text/actions.
+Synthetic and uploaded assessments have explicit source notices rather than
+being presented as verified target observations. No marketing imagery or
+sign-in controls were introduced.
+
 ## Overview
 
 **Creative North Star: "The evidence bench"**

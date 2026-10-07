@@ -1,15 +1,18 @@
 import { Component, lazy, Suspense, useEffect, useState } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
-import { Link, NavLink, Route, Routes, useLocation, useMatch } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { Activity, Boxes, Cable, ChevronRight, CircleDot, ClipboardList, FileDown, FileSearch, Fingerprint, FolderOpen, LayoutDashboard, ListTree, Menu, Network, Plus, Settings, Shield, Waypoints, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useApi } from './lib/api'
+import { api, useApi } from './lib/api'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { SessionGate, useWorkspace } from './lib/session'
 import type { Assessment } from './types'
-import { Badge, Empty, Loading } from './components/ui'
+import { Badge, ConfirmDialog, Empty, Loading, date } from './components/ui'
 import { AssessmentEditor, Assessments, Dashboard, Overview } from './pages/assessments'
 import { Endpoints, EvidenceDetailPage, EvidenceExplorer, SecurityControls, Technologies, Timeline, TransactionDetailPage, Transactions } from './pages/inventory'
 import { FindingDetailPage, Findings } from './pages/findings'
 import { CaseDetailPage, Cases, Reports, SettingsPage } from './pages/workflow'
+import { UploadData } from './pages/uploads'
 
 const AttackSurface = lazy(() => import('./pages/AttackSurface'))
 const assessmentLinks: [string, string, LucideIcon][] = [
@@ -29,6 +32,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean 
 }
 
 function Shell({ children }: { children: ReactNode }) {
+  const session = useWorkspace()
+  const cache = useQueryClient()
+  const navigate = useNavigate()
+  const [ending, setEnding] = useState(false)
+  const end = useMutation({
+    mutationFn: () => api<void>('/session', 'DELETE', {}),
+    onSuccess: () => { cache.clear(); navigate('/'); setEnding(false) },
+  })
   const location = useLocation()
   const assessmentMatch = useMatch('/assessments/:assessmentId/*')
   const findingMatch = useMatch('/findings/:id')
@@ -68,17 +79,28 @@ function Shell({ children }: { children: ReactNode }) {
         <NavLink to="/" end><LayoutDashboard size={17} />Dashboard</NavLink>
         <NavLink to="/assessments" end><ClipboardList size={17} />Assessments</NavLink>
         <NavLink to="/cases" end><FolderOpen size={17} />All cases</NavLink>
+        <NavLink to="/uploads" end><FileSearch size={17} />Upload data</NavLink>
       </nav>
       {assessmentId && <><div className="nav-context"><span>Current assessment</span><strong title={assessment.data?.name}>{assessment.data?.name || 'Loading…'}</strong></div><nav className="nav-group assessment-nav" aria-label="Assessment">{assessmentLinks.map(([path, title, Icon]) => <NavLink key={path} to={`/assessments/${assessmentId}${path ? `/${path}` : ''}`} end><Icon size={16} aria-hidden="true" />{title}{assessment.data && (path === 'findings' || path === 'evidence') && <span className="nav-count">{assessment.data.counts[path]}</span>}</NavLink>)}</nav></>}
       {!assessmentId && <div className="sidebar-guide"><Shield size={19} aria-hidden="true" /><p>Define scope.<br />Collect evidence.<br />Make the call.</p><Link to="/assessments/new"><Plus size={14} />New assessment</Link></div>}
-      <div className="sidebar-footer"><NavLink to="/settings"><Settings size={17} />Settings</NavLink><div className="connection" role="status"><span className={`connection-dot ${health.isSuccess ? 'connected' : ''}`} />{health.isSuccess ? 'Local API connected' : health.isError ? 'Local API unavailable' : 'Connecting to local API…'}</div></div>
+      <div className="sidebar-footer"><NavLink to="/settings"><Settings size={17} />Settings</NavLink><div className="connection" role="status"><span className={`connection-dot ${health.isSuccess ? 'connected' : ''}`} />{health.isSuccess ? 'API connected' : health.isError ? 'API unavailable' : 'Connecting to API…'}</div></div>
     </aside>
-    <div className="main-shell" inert={open}><div className="context-bar"><div><span className="muted">Workspace</span><ChevronRight size={13} />{assessment.data ? <><Link to={`/assessments/${assessmentId}`}>{assessment.data.name}</Link><span className="context-target mono">{assessment.data.target}</span></> : <span>Local investigations</span>}</div>{assessment.data ? <Badge value={assessment.data.config.mode} /> : <span className="local-label">Local-first · evidence-driven</span>}</div><main id="main-content" tabIndex={-1}>{children}</main><footer className="workstation-footer"><span>WebScope</span><span>Authorized assessments only. Automated observations are not analyst conclusions.</span></footer></div>
+    <div className="main-shell" inert={open}><div className="context-bar"><div><span className="muted">Workspace</span><ChevronRight size={13} />{assessment.data ? <><Link to={`/assessments/${assessmentId}`}>{assessment.data.name}</Link><span className="context-target mono">{assessment.data.target}</span></> : <span>Temporary investigations</span>}</div>{assessment.data ? <Badge value={assessment.data.config.mode} /> : <span className="local-label">Evidence-driven · no sign-in</span>}</div>
+      {session?.temporary && <section className="session-banner" aria-label="Temporary workspace notice">
+        <div><strong>Temporary session — export to keep your work</strong><p>Expires {date(session.expires_at)}. End session deletes uploads and results immediately.</p>
+          {!session.network_enabled && <p>Hosted import-only mode: upload captured data; website scanning is disabled.</p>}
+          <details><summary>Retention and privacy</summary><p>{session.retention_notice}</p><p>Tabs in this browser profile share the session. Clearing its cookie loses access; no sign-in or recovery is available.</p></details></div>
+        <div className="actions"><Link className="button small" to="/uploads">Upload data</Link><button className="button small" onClick={() => setEnding(true)}>End session</button></div>
+      </section>}
+      <main id="main-content" tabIndex={-1}>{children}</main><footer className="workstation-footer"><span>WebScope</span><span>Temporary uploads. Automated observations are not analyst conclusions.</span></footer></div>
+    {ending && <ConfirmDialog title="Delete this temporary workspace?" confirmLabel="Delete session data" onCancel={() => setEnding(false)} onConfirm={() => end.mutate()} pending={end.isPending} error={end.error} danger>
+      <p>All uploads, assessments, notes, cases and generated reports in this session will be deleted. This affects every tab sharing this browser session.</p><p>Download reports first. There is no account or recovery link.</p>
+    </ConfirmDialog>}
   </div>
 }
 
 export default function App() {
-  return <ErrorBoundary><Shell><Suspense fallback={<Loading label="Loading view…" />}><Routes>
+  return <ErrorBoundary><SessionGate><Shell><Suspense fallback={<Loading label="Loading view…" />}><Routes>
     <Route path="/" element={<Dashboard />} />
     <Route path="/assessments" element={<Assessments />} />
     <Route path="/assessments/new" element={<AssessmentEditor />} />
@@ -100,6 +122,7 @@ export default function App() {
     <Route path="/cases" element={<Cases />} />
     <Route path="/cases/:id" element={<CaseDetailPage />} />
     <Route path="/settings" element={<SettingsPage />} />
+    <Route path="/uploads" element={<UploadData />} />
     <Route path="*" element={<Empty title="View not found" action={<Link className="button primary" to="/assessments">Open assessments</Link>}><FileSearch size={16} /> Check the address or open an assessment.</Empty>} />
-  </Routes></Suspense></Shell></ErrorBoundary>
+  </Routes></Suspense></Shell></SessionGate></ErrorBoundary>
 }

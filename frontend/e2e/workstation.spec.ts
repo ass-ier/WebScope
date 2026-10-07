@@ -2,8 +2,21 @@ import { test, expect, type Page } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-const proof = path.resolve('../docs/example')
-const screenshots = path.resolve('../docs/screenshots')
+const proof = path.resolve(process.env.WEBSCOPE_PROOF_DIR || 'test-results/example')
+const screenshots = path.resolve(process.env.WEBSCOPE_SCREENSHOT_DIR || 'test-results/screenshots')
+
+test.beforeEach(async ({ page }) => {
+  const response = await page.request.post('/api/session', {
+    headers: { 'X-WebScope-Request': 'workstation' }, data: {},
+  })
+  expect(response.ok()).toBeTruthy()
+})
+
+test.afterEach(async ({ page }) => {
+  await page.request.delete('/api/session', {
+    headers: { 'X-WebScope-Request': 'workstation', 'Content-Type': 'application/json' },
+  })
+})
 
 async function submit(page: Page, button: string, suffix: string, method = 'POST') {
   const [response] = await Promise.all([
@@ -14,7 +27,8 @@ async function submit(page: Page, button: string, suffix: string, method = 'POST
   return response.json()
 }
 
-test('complete real local assessment, analyst investigation and all export formats', async ({ page, request }) => {
+test('complete real local assessment, analyst investigation and all export formats', async ({ page }) => {
+  const request = page.request
   test.setTimeout(180_000)
   mkdirSync(proof, { recursive: true })
   mkdirSync(screenshots, { recursive: true })
@@ -191,7 +205,8 @@ test('complete real local assessment, analyst investigation and all export forma
   expect(pageErrors).toEqual([])
 })
 
-test('passive creation never sends traffic and archive guards remain usable', async ({ page, request }) => {
+test('passive creation never sends traffic and archive guards remain usable', async ({ page }) => {
+  const request = page.request
   await page.goto('/assessments/new')
   await page.getByLabel('Assessment name', { exact: true }).fill('Passive workflow boundary')
   await page.getByLabel(/^Target URL/).fill('http://127.0.0.1:9998')

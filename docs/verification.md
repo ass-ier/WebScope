@@ -1,5 +1,10 @@
 # Verification record
 
+This is the original implementation proof. The subsequent no-sign-in hosted
+deployment and temporary-upload work is recorded separately in
+[hosted-verification.md](hosted-verification.md); current default browser
+workspaces are temporary rather than durable account workspaces.
+
 Verification was performed on **2026-10-07**, on an owned local workstation.
 The authoritative specification has 1,549 lines and SHA-256
 `c2d3b5c14002cc462c4e29329e62affc07c1bc9b09f85fe9ae6e9dfac0cab3fe`.

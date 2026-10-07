@@ -1,0 +1,9 @@
+{
+  "result": "PASS",
+  "render_schema": "https://render.com/schema/render.yaml.json",
+  "vercel_schema": "https://openapi.vercel.sh/vercel.json",
+  "render_ephemeral_storage": true,
+  "vercel_same_origin_api_rewrite": true,
+  "remote_deployment_performed": false,
+  "vercel_validation_scope": "Configuration instance validated; provider schema meta-validation omitted because unused experimentalTriggers mix JSON Schema drafts."
+}

@@ -1,5 +1,15 @@
 # Analyst workflow
 
+**Browser session update:** choose **Start temporary workspace**, with no
+sign-in. Two synthetic investigations are loaded automatically. Use **Upload
+data** for HAR, full WebScope JSON or OpenAPI JSON, review the permission and
+temporary-retention notice, and upload into a separate assessment. Export
+anything to keep before **End session** or the displayed expiry. Hosted
+restarts/redeploys can clear data earlier. [Full deployment/retention guide](deployment.md).
+
+The network-collection steps below apply to **local mode only**. Hosted mode is
+import-only and disables Discover/Safe checks regardless of submitted settings.
+
 1. Start the backend and frontend using [README](../README.md). For the
    synthetic example, start the loopback fixture separately.
 2. Create an assessment. Enter the authorized target, exact allowed hosts,

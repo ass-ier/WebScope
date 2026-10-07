@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowRight, CheckCircle2, FileSearch, Play, Plus, Settings2, ShieldCheck } from 'lucide-react'
 import { assessmentPath, useApi, useWrite } from '../lib/api'
+import { useWorkspace } from '../lib/session'
 import type { Assessment, AssessmentCreate, Configuration, Endpoint, Evidence, Host, Note, Technology, TimelineEvent } from '../types'
 import { assessmentIsReadOnly, severities } from '../types'
 import { AssessmentPolicyNotice, Badge, CheckField, ConfirmDialog, DataTable, Empty, ErrorNotice, Field, Loading, Meta, Notes, PageHeader, QueryState, Section, Success, date, human } from '../components/ui'
@@ -14,7 +15,7 @@ function AssessmentTable({ assessments }: { assessments: Assessment[] }) {
   return <DataTable rows={assessments} label="Assessments" search={(a) => `${a.name} ${a.target} ${a.status}`} emptyTitle="Your investigation starts with scope" emptyDescription="Create an assessment to record authorization, set boundaries, and begin collecting evidence." columns={[
     { key: 'name', label: 'Assessment / target', sort: (a) => a.name, render: (a) => <><Link className="table-title" to={assessmentPath(a.id)}>{a.name}<ArrowRight size={14} /></Link><div className="cell-secondary mono">{a.target}</div></> },
     { key: 'status', label: 'Status', sort: (a) => a.status, render: (a) => <Badge value={a.status} /> },
-    { key: 'mode', label: 'Collection', render: (a) => <Badge value={a.config.mode} /> },
+    { key: 'mode', label: 'Source / collection', render: (a) => <><Badge value={a.data_origin || 'COLLECTED'} /> <Badge value={a.config.mode} /></> },
     { key: 'findings', label: 'Findings', sort: (a) => a.counts.findings, render: (a) => <Link to={`${assessmentPath(a.id)}/findings`}>{a.counts.findings}</Link> },
     { key: 'evidence', label: 'Evidence', sort: (a) => a.counts.evidence, render: (a) => <Link to={`${assessmentPath(a.id)}/evidence`}>{a.counts.evidence}</Link> },
     { key: 'updated', label: 'Updated', sort: (a) => a.updated_at, render: (a) => date(a.updated_at) },
@@ -88,6 +89,7 @@ function AssessmentForm({ assessment, config: initial }: { assessment?: Assessme
 }
 
 function AssessmentActions({ assessment }: { assessment: Assessment }) {
+  const workspace = useWorkspace()
   const [action, setAction] = useState<'discover' | 'checks' | null>(null)
   const [cors, setCors] = useState(false)
   const validate = useWrite<Assessment>(assessmentPath(assessment.id, 'validate'))
@@ -97,7 +99,7 @@ function AssessmentActions({ assessment }: { assessment: Assessment }) {
   const locked = assessment.status === 'ARCHIVED' || assessment.status === 'RUNNING'
   const pending = validate.isPending || discover.isPending || analyze.isPending || checks.isPending
   const validated = ['READY', 'COMPLETED', 'FAILED'].includes(assessment.status)
-  const networkAllowed = assessment.authorized && assessment.config.mode === 'SAFE_HTTP' && validated && !locked
+  const networkAllowed = (workspace?.network_enabled ?? true) && assessment.authorized && assessment.config.mode === 'SAFE_HTTP' && validated && !locked
   const active = action === 'checks' ? checks : discover
   return <><div className="action-bar"><div className="actions"><button className="button" disabled={pending || locked || !assessment.authorized} onClick={() => validate.mutate({})}><CheckCircle2 size={15} />{validate.isPending ? 'Validating…' : 'Validate target'}</button><button className="button primary" disabled={pending || !networkAllowed} onClick={() => { discover.reset(); setAction('discover') }}><Play size={15} />Discover</button><button className="button" disabled={pending || locked} onClick={() => analyze.mutate({})}><FileSearch size={15} />{analyze.isPending ? 'Analyzing…' : 'Analyze evidence'}</button><button className="button" disabled={pending || !networkAllowed || assessment.config.safe_paths.length === 0} onClick={() => { checks.reset(); setAction('checks') }}><ShieldCheck size={15} />Safe checks</button></div>{!locked && <Link to={`${assessmentPath(assessment.id)}/edit`} className="text-link"><Settings2 size={14} />Edit policy</Link>}</div>
     <div className="collection-notice">{locked ? 'Assessment is read-only. Restore an archived assessment to draft before making changes.' : assessment.config.mode === 'PASSIVE' ? 'PASSIVE · No target network requests. Analyze existing evidence without authorization or network activity. Enable Safe HTTP in policy for collection.' : !assessment.authorized ? 'Authorization required. Record permission in assessment policy before collection.' : !validated ? 'DRAFT · Validate the authorized target to make it READY before discovery or safe checks. Validation itself sends no network requests.' : `${assessment.config.max_requests} requests maximum · ${assessment.config.rate_per_second}/second · ${assessment.config.timeout_seconds}s timeout · explicitly initiated only`}{!locked && assessment.config.safe_paths.length === 0 && <div>Safe checks require at least one explicitly configured safe path.</div>}</div>
@@ -125,7 +127,10 @@ export function Overview() {
   const remove = useWrite<void>(assessmentPath(assessmentId), 'DELETE')
   const archive = useWrite<Assessment>(assessmentPath(assessmentId), 'PATCH')
   const navigate = useNavigate()
-  return <QueryState query={query}>{(assessment) => <><PageHeader title={assessment.name} description={<span className="mono">{assessment.target}</span>} actions={<Badge value={assessment.status} />} /><AssessmentActions assessment={assessment} />
+  return <QueryState query={query}>{(assessment) => <><PageHeader title={assessment.name} description={<span className="mono">{assessment.target}</span>} actions={<Badge value={assessment.status} />} />
+    {assessment.data_origin === 'SYNTHETIC' && <div className="notice"><strong>Synthetic example</strong><span>These records demonstrate the workstation. They are not evidence of vulnerabilities in a real target.</span></div>}
+    {assessment.data_origin === 'UPLOADED' && <div className="notice"><strong>Uploaded data · unverified source</strong><span>Imported evidence and conclusions are declarations from your file. No target was contacted or claim independently verified.</span></div>}
+    <AssessmentActions assessment={assessment} />
     {assessment.description && <p className="description-copy">{assessment.description}</p>}
     <div className="inventory-strip">{(['hosts', 'endpoints', 'apis', 'technologies', 'transactions', 'evidence'] as const).map((kind) => <Link key={kind} to={`${assessmentPath(assessment.id)}/${kind === 'hosts' ? 'graph' : kind === 'apis' ? 'endpoints' : kind}`}><strong>{assessment.counts[kind]}</strong><span>{kind === 'apis' ? 'APIs' : human(kind)}</span><ArrowRight size={13} /></Link>)}</div>
     <div className="overview-grid"><Section title="Finding severity" action={<Link to={`${assessmentPath(assessment.id)}/findings?view=prioritized`}>Review findings <ArrowRight size={13} /></Link>}><p className="muted section-intro">Effective severity · analyst overrides applied · false positives and dismissed findings excluded</p>

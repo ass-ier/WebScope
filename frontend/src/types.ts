@@ -55,6 +55,7 @@ export interface AssessmentCreate {
   authorization_note: string
 }
 export interface Assessment extends Identity, AssessmentCreate {
+  data_origin?: 'COLLECTED' | 'SYNTHETIC' | 'UPLOADED'
   status: 'DRAFT' | 'READY' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'ARCHIVED'
   updated_at: string
   authorized_at: string | null

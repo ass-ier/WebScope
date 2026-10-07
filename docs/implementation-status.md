@@ -1,5 +1,12 @@
 # Implementation and acceptance matrix
 
+**Follow-up:** this original 45-section register is supplemented by
+[deployment.md](deployment.md) and [hosted verification](hosted-verification.md).
+The user subsequently requested Vercel/Render deployment, no sign-in, isolated
+temporary uploads and prominent retention notices. Hosted import-only mode and
+ephemeral session storage are intentional user-directed behavior changes;
+local collection and the original deterministic analysis remain available.
+
 This register covers all **45 sections** of the authoritative 1,549-line
 specification, SHA-256
 `c2d3b5c14002cc462c4e29329e62affc07c1bc9b09f85fe9ae6e9dfac0cab3fe`.

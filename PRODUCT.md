@@ -38,3 +38,12 @@ third-party assessment results or real-world interoperability claims.
 ## Product Principles
 Evidence first; authorization first; passive analysis before safe active checks;
 automated observations separate from analyst conclusions; transparent risk.
+
+## Hosted Workspaces
+User-directed extension: Vercel frontend and Render API, **no sign-in**.
+Anonymous browser sessions contain synthetic examples and temporary uploads.
+Session-owned uploads/results expire after 24 hours, can be deleted immediately
+with End session, and are cleared earlier by hosted restart/redeploy.
+Prominent retention and export reminders are part of the product, not optional
+legal fine print. Tabs in the same browser profile share a session.
+Hosted deployments are import-only; authorized target collection remains local.

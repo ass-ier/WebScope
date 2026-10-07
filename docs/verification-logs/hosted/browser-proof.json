@@ -1,0 +1,50 @@
+{
+  "result": "PASS",
+  "observed_at": "2026-10-07T21:28:45.764Z",
+  "no_signin": true,
+  "synthetic_assessments": [
+    {
+      "origin": "SYNTHETIC",
+      "counts": {
+        "hosts": 1,
+        "technologies": 0,
+        "transactions": 0,
+        "evidence": 9,
+        "cases": 0,
+        "endpoints": 0,
+        "findings": 4,
+        "apis": 0
+      }
+    },
+    {
+      "origin": "SYNTHETIC",
+      "counts": {
+        "hosts": 1,
+        "technologies": 3,
+        "transactions": 12,
+        "evidence": 139,
+        "cases": 1,
+        "endpoints": 22,
+        "findings": 44,
+        "apis": 5
+      }
+    }
+  ],
+  "imported_counts": {
+    "hosts": 0,
+    "technologies": 0,
+    "transactions": 1,
+    "evidence": 13,
+    "cases": 0,
+    "endpoints": 2,
+    "findings": 12,
+    "apis": 1
+  },
+  "redaction": "PASS",
+  "session_isolation": "PASS",
+  "immediate_deletion_and_cookie_revocation": "PASS",
+  "http_only_secure_session_cookie": true,
+  "page_errors": [],
+  "all_browser_requests_same_origin": true,
+  "environment": "Owned loopback HTTPS hosted-mode fixture; not a deployed Vercel/Render service"
+}

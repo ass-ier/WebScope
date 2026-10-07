@@ -113,6 +113,22 @@ main:focus { outline: none; }
 .section-heading > a { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 .section-intro { margin-bottom: 17px; font-size: 13px; }
 .section > p + p { margin-top: 10px; }
+.session-entry { max-width: 780px; margin: 9vh auto; padding: 32px; }
+.session-entry .page-description { font-size: 16px; line-height: 1.7; }
+.retention-list { display: grid; gap: 16px; margin: 20px 0 24px; font-size: 16px; }
+.session-banner { padding: 16px 32px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; background: var(--surface-raised); border-bottom: 1px solid var(--line); }
+.session-banner > div { min-width: 0; }
+.session-banner p { color: var(--muted); margin-top: 4px; font-size: 12px; }
+.session-banner .actions { flex-shrink: 0; }
+.session-banner details p { max-width: 75ch; }
+.retention-emphasis p { margin-top: 6px; }
+.upload-selected { margin-top: 14px; }
+@media (max-width: 760px) {
+  .session-entry { margin-top: 24px; padding: 20px; }
+  .session-banner { padding: 16px; flex-direction: column; gap: 12px; }
+  .session-banner .actions { width: 100%; }
+  .session-banner .button { flex: 1; min-height: 40px; }
+}
 .section h3 { margin-top: 15px; margin-bottom: 8px; }
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
 .workspace-summary { display: flex; align-items: center; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 21px 0; gap: 0; }

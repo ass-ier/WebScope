@@ -131,6 +131,7 @@ def test_expiry_blocks_access_before_cleanup_and_cleanup_deletes(hosted, engine)
 def test_boundary_and_capacity_are_fail_closed(engine):
     app = create_app(engine, replace(HOSTED, max_sessions=1))
     with TestClient(app, base_url="https://webscope.test", headers=HEADERS) as client:
+        assert client.get("/api/health", headers={"Host": "platform-internal"}).status_code == 200
         assert (
             client.post("/api/session", json={}, headers={"Origin": "https://evil.test"}).status_code == 403
         )

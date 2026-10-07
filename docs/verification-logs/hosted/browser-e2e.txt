@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › e2e/temporary-workspace.spec.ts:5:1 › anonymous hosted sessions, synthetic data, uploads, privacy and immediate deletion (2.3s)
+
+  1 passed (2.8s)

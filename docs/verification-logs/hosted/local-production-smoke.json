@@ -1,0 +1,15 @@
+{
+  "result": "PASS",
+  "observed_at": "2026-10-07T21:29:56.442Z",
+  "base_url": "http://127.0.0.1:8765",
+  "assessment_id": "c8032315-21d0-4799-97aa-a008eb29bdaf",
+  "production_spa_deep_links": true,
+  "synthetic_finding_notes_case_and_report": true,
+  "compiled_graph_visible": true,
+  "restrictive_csp": true,
+  "all_browser_requests_local": true,
+  "page_errors": [],
+  "requests_observed": 23,
+  "vite_required": false,
+  "target_fixture_required_for_inspection": false
+}

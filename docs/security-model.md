@@ -1,5 +1,20 @@
 # Security model and responsible operation
 
+## Hosted temporary-workspace update
+
+The original loopback workstation remains available locally. The hosted
+Vercel/Render mode now uses **anonymous, isolated, expiring browser workspaces**,
+with no sign-in or account recovery. Hosted collection is disabled at the
+backend service boundary; only synthetic fixtures and validated offline
+uploads can be investigated.
+
+See [deployment and retention](deployment.md) for the 24-hour expiry, immediate
+End session deletion, restart/redeploy clearing, ephemeral Render storage,
+HttpOnly/Secure session-cookie policy, upload limits, and exact-origin proxy
+configuration. All IDs, inventories, rules, notes, cases and report downloads
+are checked against the current workspace. Local legacy sessionless records
+remain separate from browser-session data.
+
 ## Authorization and scope
 
 Only assess systems you own or have explicit written permission to assess.
@@ -69,10 +84,11 @@ workstation` header and JSON content type; there is no permissive CORS policy.
 The backend returns a restrictive CSP, no-sniff, no-referrer and no-store.
 Request-validation errors do not echo submitted values.
 
-This is **not** a multi-user network service. There is no account login or
+**Local mode is not a public network service.** There is no account login or
 protection against a malicious local process running as the same OS user.
-Do not expose port 8765 publicly, run as root, or deploy behind a permissive
-proxy. Local machine access and backups are part of the trust boundary.
+Do not expose local mode on port 8765 publicly, run as root, or deploy behind a
+permissive proxy. Use explicit hosted mode for deployment. Local machine
+access and operator-created backups remain part of the trust boundary.
 
 ## Redaction and untrusted data
 

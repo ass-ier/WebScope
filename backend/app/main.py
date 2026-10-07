@@ -107,7 +107,8 @@ def create_app(engine=None, deployment=None):
         )
         if testing:
             allowed_hosts.add("testserver")
-        if host not in allowed_hosts:
+        public_health_probe = request.url.path == "/api/health" and request.method in ("GET", "HEAD")
+        if host not in allowed_hosts and not public_health_probe:
             return JSONResponse({"detail": "Invalid local workstation Host"}, status_code=403)
         origin = request.headers.get("origin")
         permitted_origins = (

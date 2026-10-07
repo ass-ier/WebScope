@@ -22,6 +22,13 @@ function mockApi(handler?: Handler) {
     if (custom) return custom
     if (call.method !== 'GET') return json({ detail: `Unhandled test write: ${call.method} ${path}` }, 400)
     if (path === '/health') return json({ status: 'ok' })
+    if (path === '/session') return json({
+      mode: 'local', temporary: true, session_active: true, network_enabled: true,
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      retention_notice: 'Temporary workspace. Expires 24 hours after creation. Closing a tab does not delete server data.',
+      max_upload_bytes: 2_000_000, max_storage_bytes: 20_000_000, max_assessments: 10,
+      formats: ['webscope', 'har', 'openapi'],
+    })
     if (path === '/settings') return json(data.config)
     if (path === '/rules') return json([data.rule])
     if (path === '/assessments') return json([data.assessment])
@@ -246,7 +253,7 @@ describe('inventory, cases, configuration, and exports', () => {
     const user = userEvent.setup()
     const { calls } = mockApi((call) => call.method === 'POST' && call.path.endsWith('/endpoints') ? json({ id: 'endpoint-1' }, 201) : undefined)
     renderApp('/assessments/a-1/endpoints')
-    await user.click(screen.getByRole('button', { name: 'Add endpoint' }))
+    await user.click(await screen.findByRole('button', { name: 'Add endpoint' }))
     await user.type(screen.getByLabelText('Endpoint URL'), 'https://fixture.test/api/profile')
     await user.selectOptions(screen.getByLabelText(/HTTP method/), 'POST')
     await user.click(screen.getByRole('button', { name: 'Save endpoint' }))
@@ -259,7 +266,7 @@ describe('inventory, cases, configuration, and exports', () => {
     const user = userEvent.setup()
     const { calls } = mockApi((call) => call.method === 'POST' && call.path.endsWith('/openapi') ? json({ imported: 1 }) : undefined)
     renderApp('/assessments/a-1/endpoints')
-    await user.click(screen.getByRole('button', { name: 'Import OpenAPI' }))
+    await user.click(await screen.findByRole('button', { name: 'Import OpenAPI' }))
     const textarea = screen.getByLabelText('OpenAPI document')
     await user.type(textarea, 'not json')
     await user.click(screen.getByRole('button', { name: 'Import inventory' }))
@@ -278,7 +285,7 @@ describe('inventory, cases, configuration, and exports', () => {
     const user = userEvent.setup()
     const { calls } = mockApi()
     renderApp('/assessments/a-1/endpoints')
-    const openImport = screen.getByRole('button', { name: 'Import OpenAPI' })
+    const openImport = await screen.findByRole('button', { name: 'Import OpenAPI' })
     await waitFor(() => expect(openImport).toBeEnabled())
     await user.click(openImport)
     expect(screen.getByText('Maximum 2 MB. JSON only; convert YAML locally before importing.')).toBeVisible()
@@ -316,7 +323,7 @@ describe('inventory, cases, configuration, and exports', () => {
       }
     })
     renderApp('/assessments/a-1/cases')
-    await user.click(screen.getByRole('button', { name: 'New case' }))
+    await user.click(await screen.findByRole('button', { name: 'New case' }))
     await user.type(await screen.findByLabelText('Case title'), 'Browser policy review')
     await user.click(await screen.findByLabelText(/Missing fixture policy/))
     await user.click(screen.getByLabelText(/Captured fixture response/))
@@ -483,7 +490,7 @@ describe('inventory, cases, configuration, and exports', () => {
         }],
       }) : undefined)
       renderApp('/assessments/a-1/controls')
-      await user.click(screen.getByRole('tab', { name: 'CORS' }))
+      await user.click(await screen.findByRole('tab', { name: 'CORS' }))
       expect(await screen.findByRole('cell', { name: 'true' })).toBeVisible()
       expect(screen.getByRole('link', { name: 'Source response' })).toHaveAttribute('href', '/evidence/e-1')
       expect(screen.getByRole('link', { name: 'CORS observation' })).toHaveAttribute('href', '/evidence/cors-1')
@@ -526,7 +533,7 @@ describe('inventory, cases, configuration, and exports', () => {
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     renderApp('/assessments/a-1/reports')
-    await user.click(screen.getByRole('button', { name: 'Generate report' }))
+    await user.click(await screen.findByRole('button', { name: 'Generate report' }))
     await user.click(await screen.findByRole('button', { name: 'Download assessment.md' }))
     await waitFor(() => expect(createObjectURL).toHaveBeenCalled())
     expect(await (createObjectURL.mock.calls[0][0] as Blob).text()).toContain('Verified byte content.')

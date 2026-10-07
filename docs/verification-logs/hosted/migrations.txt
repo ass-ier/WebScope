@@ -1,0 +1,4 @@
+No new upgrade operations detected.
+Revision: 0004
+Integrity: ok
+Foreign key violations: []

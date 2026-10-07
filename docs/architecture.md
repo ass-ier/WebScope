@@ -1,6 +1,13 @@
 # Architecture
 
-WebScope is a single-user, local-first investigation workstation. The backend
+The hosted extension is described in [deployment.md](deployment.md):
+Vercel's same-origin API rewrite fronts Render's import-only API; ephemeral
+SQLite stores isolated anonymous workspaces. Migration `0004` adds workspace
+expiry/hashed tokens and assessment ownership without exposing legacy local
+records. A cleanup worker removes expired workspaces; hosted startup clears
+previous sessions. All data-upload relationships are validated and re-keyed.
+
+WebScope is a local-first investigation workstation. The backend
 owns collection policy and evidence; the browser never contacts assessment
 targets. There is no AI, scanner subprocess, remote intelligence dependency,
 or target JavaScript execution.

@@ -1,0 +1,18 @@
+# Intentionally ephemeral: uploads must not survive service restarts or redeploys.
+services:
+  - type: web
+    name: webscope-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -c backend/requirements.lock -e backend
+    startCommand: bash scripts/run-render.sh
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.11
+      - key: WEBSCOPE_DEPLOYMENT
+        value: hosted
+      - key: WEBSCOPE_DATA_DIR
+        value: /tmp/webscope
+      - key: WEBSCOPE_PUBLIC_ORIGIN
+        sync: false

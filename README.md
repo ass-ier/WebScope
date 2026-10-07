@@ -2,6 +2,19 @@
 
 **Evidence-Driven Web Application Security Assessment Workstation**
 
+**Deployment update:** WebScope now supports **Vercel + Render with no sign-in**.
+Each browser session gets an isolated temporary workspace containing the complete
+synthetic web investigation plus DNS/TLS examples. Users can upload **HAR,
+WebScope assessment JSON and OpenAPI JSON**. Uploads and results expire after
+24 hours, are deleted immediately by **End session**, and disappear earlier
+on hosted restarts/redeploys. The UI prominently explains this before entry
+and upload. [Deployment and retention guide](docs/deployment.md).
+
+Hosted mode is deliberately **import-only**: it cannot scan targets. Authorized
+network collection remains available in local mode. The Render blueprint uses
+disposable storage, not a persistent disk; nothing has been deployed remotely
+by preparing these files.
+
 WebScope turns an explicitly authorized web target into an inspectable security
 investigation: scoped discovery, application inventory, deterministic security
 observations, preserved evidence, analyst conclusions, transparent priority,
@@ -34,6 +47,10 @@ bash scripts/run-local.sh
 Open **http://127.0.0.1:8765**. The script applies Alembic migrations before
 starting the loopback-only API and serving the compiled frontend. Keep one
 backend worker. The SQLite database defaults to `data/webscope.db`.
+Choose **Start temporary workspace**; no account is required. Existing legacy
+local assessments are not deleted by the migration, but browser sessions expose
+only their own data. Sessionless local API access retains the legacy local
+workspace; hosted APIs always require the anonymous session cookie.
 
 For frontend development, keep the backend running and use another terminal:
 
@@ -60,6 +77,7 @@ Resolve custom paths deliberately; defaults assume the provided startup script.
 | Analyst workflow | Status, written conclusions, notes, independent severity/confidence changes, explained risk overrides, linked cases and audit timeline |
 | Visualization | Real interactive attack-surface graph, inventories, severity summary, technology relationships and responsive workstation pages |
 | Reporting | Persisted Markdown, complete assessment JSON, native PDF, and CSV endpoints/findings/technologies/evidence index |
+| Temporary uploads | Isolated no-sign-in workspaces, complete synthetic examples, validated HAR/WebScope/OpenAPI uploads, expiry and immediate deletion |
 
 All required pages are implemented: Dashboard, Assessments, Create Assessment,
 Overview, Attack Surface, Endpoints, Technologies, HTTP Transactions, Security
@@ -185,17 +203,21 @@ The [45-section implementation matrix](docs/implementation-status.md) and
 limitations and optional/non-goal work. Test logs live in
 `docs/verification-logs/`. No third-party target was scanned.
 
-Recorded result: **109 backend + 43 frontend + 2 browser tests passed**
-(154 total, no failures or skips). Production build/typecheck, migration
-round-trip, seven parsed report artifacts and an offline production/reopen
-smoke check also passed. The latter is reproducible with
+Current recorded result: **134 backend + 54 frontend + 3 browser tests passed**
+(191 total, no failures or skips). The browser suites separately cover the
+local collection workflow and hosted temporary uploads. Production
+build/typecheck, migration round-trip, deployment configuration validation and
+compiled-app smoke checks also passed. The compiled-app check is reproducible with
 `node scripts/verify-production.mjs` after starting only the compiled backend
-against the preserved proof database.
+and loads a fresh temporary synthetic workspace. See
+[hosted verification](docs/hosted-verification.md) for exact current results;
+the original seven example reports remain committed and independently parsed.
 
 ## Limitations and responsible use
 
-- Single-user local tool, not an authenticated multi-user server. Do not expose
-  the backend publicly or run it with elevated privileges.
+- Local mode is not for public exposure. Hosted mode offers isolated anonymous
+  temporary workspaces, not authenticated accounts or recovery. Do not run
+  either mode with elevated privileges.
 - HTTP collection does not execute target JavaScript or log into applications.
   Forms/imported mutation methods are inventory only. GET is not guaranteed
   side-effect-free in badly designed applications; exclude action URLs.

@@ -35,9 +35,12 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
   } catch {
-    throw new ApiError('Cannot reach the local API. Check that the WebScope backend is running, then retry.', 0)
+    throw new ApiError('Cannot reach the WebScope API. Check your connection or service availability, then retry.', 0)
   }
-  if (!response.ok) throw await responseError(response)
+  if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event('webscope-session-expired'))
+    throw await responseError(response)
+  }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
@@ -57,7 +60,7 @@ export function useWrite<T, B = unknown>(path: string, method = 'POST') {
 export async function downloadReport(id: string, filename: string) {
   let response: Response
   try { response = await fetch(`/api/reports/${encodeURIComponent(id)}/download`) }
-  catch { throw new ApiError('Download failed. Check the local backend and try again.', 0) }
+  catch { throw new ApiError('Download failed. Check your connection and try again before the session expires.', 0) }
   if (!response.ok) throw await responseError(response)
   const url = URL.createObjectURL(await response.blob())
   const link = document.createElement('a')

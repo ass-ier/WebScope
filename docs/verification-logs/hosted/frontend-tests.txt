@@ -1,0 +1,14 @@
+
+> webscope-frontend@1.0.0 test
+> vitest run --reporter=dot
+
+
+ RUN  v3.2.7 /Users/triplea/Documents/CyberProjects/copilot-worktrees/WebScope/mk23rd-symmetrical-couscous/frontend
+
+······················································
+
+ Test Files  4 passed (4)
+      Tests  54 passed (54)
+   Start at  00:27:16
+   Duration  8.00s (transform 366ms, setup 675ms, collect 865ms, tests 7.45s, environment 2.24s, prepare 307ms)
+

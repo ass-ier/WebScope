@@ -1,5 +1,18 @@
 # Evidence and provenance
 
+Uploaded HAR, WebScope JSON and OpenAPI JSON now enter isolated temporary
+browser workspaces. See [deployment.md](deployment.md). Imported evidence
+receives fresh IDs and recomputed redacted integrity hashes, retaining declared
+source ID/hash/collector as **unverified import provenance**. Imported rule
+declarations are namespaced to the new assessment and cannot overwrite installed
+rules. PNG evidence is decoded, dimension-checked and re-encoded without source
+metadata; its pixels still require uploader review.
+
+Synthetic templates are labeled SYNTHETIC, uploads UPLOADED, and locally
+collected records COLLECTED. Importing never grants target authorization or
+executes an endpoint. Session expiry/deletion removes the whole owned evidence
+graph rather than leaving orphaned findings.
+
 `Evidence` stores a UUID, assessment UUID, type, source, summary, timestamp,
 collector version, redacted structured data, redacted raw text, and integrity
 SHA-256. HTTP response body hashes separately describe the collected decoded
