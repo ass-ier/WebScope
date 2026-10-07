@@ -4,6 +4,40 @@ User-directed follow-up: prepare Vercel/Render deployment, include synthetic
 data, allow user uploads, **do not add sign-in**, isolate temporary sessions,
 and make retention obvious. Verified locally on 2026-10-08 (UTC+03:00).
 
+## Vercel import fix — 2026-10-08
+
+The user encountered `rewrites[0] missing required property destination` while
+importing the project. The published `frontend/vercel.mjs` matched the local
+file; its computed template-literal destinations were not extractable during
+Vercel's project-import phase. The prior Node execution/schema checks did not
+cover that platform-specific parsing.
+
+The fix removes `vercel.mjs` and uses an environment-independent,
+plain `frontend/vercel.json`. `npm run build:vercel` validates
+`WEBSCOPE_API_ORIGIN` during the actual build and generates concrete Build Output
+API v3 routes plus the complete static frontend. Project import no longer
+contains environment-dependent rewrite fields. Framework preset is **Other**;
+the actual frontend build remains Vite. No new runtime or test dependencies
+were retained.
+
+Verified after the fix:
+
+- `cd frontend && npm ci --no-audit --no-fund` — clean install passed.
+- `npm test -- --reporter=dot` — **60 passed**.
+- `WEBSCOPE_API_ORIGIN=https://webscope-api.example.invalid npm run build:vercel`
+  — TypeScript, Vite, static asset packaging and route manifest generation passed.
+  The `.invalid` URL was only a build fixture; no request was sent to it.
+- `.venv/bin/python scripts/validate-deployment.py` — Render configuration,
+  static Vercel project configuration and generated routes passed provider-schema
+  validation, subject to the existing provider meta-schema caveat below.
+
+New checks cover static import with no environment variables, concrete API
+destinations, route order, static-file precedence, missing-asset handling,
+different backend origins, and rejection of missing/invalid origin values
+before a build emits routes. The earlier results below are retained as the
+original hosted-workspace verification record. A public redeploy remains
+unverified until the user pushes this fix and supplies the actual Render URL.
+
 ## Implemented behavior
 
 | Requirement | Implementation | Executed proof |
@@ -16,7 +50,7 @@ and make retention obvious. Verified locally on 2026-10-08 (UTC+03:00).
 | Temporary retention | Fixed 24-hour expiry, background cleanup, immediate End session deletion, hosted startup reset | Expiry denial, cleanup deletion, copied-cookie revocation and restart tests |
 | Obvious notice | Entry copy, persistent session banner, upload acknowledgement, expiry timestamp, deletion dialog | Desktop/mobile screenshots and component/browser assertions |
 | Hosted network safety | Backend import-only collection gate | Fail-on-network hooks and disabled browser actions |
-| Vercel frontend | `frontend/vercel.mjs`, validated API origin, same-origin rewrite, SPA routing/security headers | Six config tests, provider-schema instance validation, production build |
+| Vercel frontend | Static `frontend/vercel.json` plus `scripts/build-vercel.mjs`, validated build-time API origin and Build Output API v3 routes | Config tests, provider-schema instance validation and complete Vercel build |
 | Render backend | `render.yaml`, native Python, migration/start script, free plan and ephemeral storage | Provider blueprint schema validation and local hosted-mode startup |
 | Existing local workflows | Local safe collection, review, notes, cases and all exports remain operational | Two original full browser workflows rerun using session-scoped requests |
 

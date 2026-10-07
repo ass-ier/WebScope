@@ -102,17 +102,20 @@ Import the same repository into Vercel:
 | Setting | Value |
 |---|---|
 | Root Directory | **`frontend`** |
-| Framework | Vite |
+| Framework preset | **Other** (`framework: null` in `vercel.json`; the app still builds with Vite) |
 | Install | `npm ci` |
-| Build | `npm run build` |
-| Output | `dist` |
+| Build | `npm run build:vercel` |
+| Output override | **Unset**; the build emits `.vercel/output/` using Build Output API v3 |
 | Environment | `WEBSCOPE_API_ORIGIN=https://your-webscope-api.onrender.com` |
 
-`frontend/vercel.mjs` reads `WEBSCOPE_API_ORIGIN` at build time and creates:
+`frontend/vercel.json` is static and can be read during project creation without
+environment variables. `frontend/scripts/build-vercel.mjs` reads
+`WEBSCOPE_API_ORIGIN` during the actual build, validates it, runs the normal
+Vite build and emits `.vercel/output/config.json` plus static assets. Its routes provide:
 
 - `/api/*` → the Render API;
 - `/openapi.json` → the Render schema;
-- the SPA fallback for frontend routes;
+- static-file serving before the SPA fallback for frontend routes;
 - security headers and `no-store` for API responses.
 
 The browser sends requests only to the **Vercel origin**. The rewrite forwards
@@ -125,6 +128,25 @@ Render's `WEBSCOPE_PUBLIC_ORIGIN`. If it differs, update Render and redeploy.
 Changing the API upstream requires a Vercel redeploy. Preview deployment
 origins are intentionally not wildcard-allowed; use a separate API configured
 for a specific preview origin if needed.
+
+### Fixing `rewrites[0] missing required property destination`
+
+The previous programmatic `vercel.mjs` constructed destinations with
+`new URL(process.env.WEBSCOPE_API_ORIGIN)`. Vercel's project-import parser
+could not statically extract those values. A regular Node import test did not
+reproduce that platform behavior.
+
+The replacement is a plain `vercel.json` containing no dynamic rewrites.
+The real build writes concrete `dest` URLs into Build Output API v3 routes,
+after environment variables are available. Push the replacement files to the
+branch Vercel imports, then refresh/restart project import. The expected preset
+is now **Other**, the build command is `npm run build:vercel`, and the output
+override stays unset. The application itself remains Vite.
+
+Under **Environment Variables → Add More**, add `WEBSCOPE_API_ORIGIN` with the
+actual HTTPS Render service URL, without `/api`. Missing or malformed values
+stop the build with an explicit message instead of producing incomplete routes.
+Do not guess a Render URL or insert `undefined` into a rewrite.
 
 ## 4. Deployment smoke check
 
@@ -209,6 +231,7 @@ local fixture run**. It does not alter production target TLS validation.
 
 ## Provider references checked
 
-- [Vercel programmatic configuration](https://vercel.com/docs/project-configuration/vercel-ts)
+- [Vercel Build Output API](https://vercel.com/docs/build-output-api)
+- [Vercel Build Output routing configuration](https://vercel.com/docs/build-output-api/configuration)
 - [Render Blueprint specification](https://render.com/docs/blueprint-spec)
 - [Render ephemeral filesystems and disks](https://render.com/docs/disks)

@@ -203,8 +203,8 @@ The [45-section implementation matrix](docs/implementation-status.md) and
 limitations and optional/non-goal work. Test logs live in
 `docs/verification-logs/`. No third-party target was scanned.
 
-Current recorded result: **134 backend + 54 frontend + 3 browser tests passed**
-(191 total, no failures or skips). The browser suites separately cover the
+Current recorded result: **134 backend + 60 frontend + 3 browser tests passed**
+(197 total, no failures or skips across the recorded suites). The browser suites separately cover the
 local collection workflow and hosted temporary uploads. Production
 build/typecheck, migration round-trip, deployment configuration validation and
 compiled-app smoke checks also passed. The compiled-app check is reproducible with

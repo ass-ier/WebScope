@@ -19,3 +19,4 @@ htmlcov/
 .impeccable/hook.cache.json
 .env
 .env.local
+frontend/.vercel/

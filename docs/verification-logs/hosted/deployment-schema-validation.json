@@ -5,5 +5,7 @@
   "render_ephemeral_storage": true,
   "vercel_same_origin_api_rewrite": true,
   "remote_deployment_performed": false,
+  "vercel_static_project_config": true,
+  "vercel_build_output_version": 3,
   "vercel_validation_scope": "Configuration instance validated; provider schema meta-validation omitted because unused experimentalTriggers mix JSON Schema drafts."
 }
