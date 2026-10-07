@@ -1,0 +1,84 @@
+{
+  "result": "PASS",
+  "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+  "artifacts_verified": 7,
+  "minimum_recorded_attempt_spacing_seconds": 0.1,
+  "rate_configuration_per_second": 10,
+  "actual_collector_requests": 12,
+  "additional_fixture_audit_reads": 3,
+  "redaction_sentinels_checked": 5,
+  "redacted_capture_dimensions": [
+    1100,
+    470
+  ],
+  "artifacts": [
+    {
+      "format": "markdown",
+      "dataset": "assessment",
+      "id": "4e4162de-48a3-4100-a51f-b83fb57df1ff",
+      "filename": "webscope-e470520c-assessment.md",
+      "artifact": "assessment.md",
+      "bytes": 221699,
+      "sha256": "91bd866dbd153940e6cdeddf8ea084dc4f6af4f7ea158b49f5c56a341398eb91"
+    },
+    {
+      "format": "json",
+      "dataset": "assessment",
+      "id": "ce3c0db6-983c-4215-8e7e-564458b8618a",
+      "filename": "webscope-e470520c-assessment.json",
+      "artifact": "assessment.json",
+      "bytes": 501570,
+      "sha256": "7e066bf99fc9356911fb49adf9a05507a00670bb1afb217a936a0d8db132aadc"
+    },
+    {
+      "format": "pdf",
+      "dataset": "assessment",
+      "id": "5d8df266-1a0c-4486-b3ea-7878f27943d8",
+      "filename": "webscope-e470520c-assessment.pdf",
+      "artifact": "assessment.pdf",
+      "bytes": 120820,
+      "sha256": "0eaf78ad4b90198056cb758fa1c1102983a3c0868c2afd8c011d6cec863400c8",
+      "pages": 67
+    },
+    {
+      "format": "csv",
+      "dataset": "endpoints",
+      "id": "9a645a7d-0259-455d-9941-78357f1874d8",
+      "filename": "webscope-e470520c-endpoints.csv",
+      "artifact": "endpoints.csv",
+      "bytes": 3670,
+      "sha256": "cac8193e21192c9e149b0ed58ddf4efddea104bf07ce87fb95c68cedff73dcd1",
+      "rows": 22
+    },
+    {
+      "format": "csv",
+      "dataset": "findings",
+      "id": "3c3f83d3-0421-404d-a8ad-130f3e509e9f",
+      "filename": "webscope-e470520c-findings.csv",
+      "artifact": "findings.csv",
+      "bytes": 14845,
+      "sha256": "c5801546a7b0808372e15359bc2eb31fcfa8d41466e4ecf64355580ec848bd88",
+      "rows": 44
+    },
+    {
+      "format": "csv",
+      "dataset": "technologies",
+      "id": "b65efbc5-32c3-4ea7-8879-e92f7c5f9fc7",
+      "filename": "webscope-e470520c-technologies.csv",
+      "artifact": "technologies.csv",
+      "bytes": 510,
+      "sha256": "cce7729d5e540a2eb9600d0847fe054c0e29357d8af0a74cfd6be97aa8901ddb",
+      "rows": 3
+    },
+    {
+      "format": "csv",
+      "dataset": "evidence",
+      "id": "b6352032-5f7b-4995-ae34-7cbdebefa042",
+      "filename": "webscope-e470520c-evidence.csv",
+      "artifact": "evidence.csv",
+      "bytes": 31456,
+      "sha256": "9070fea05480fc4a69910df56589d88cb05226935a9abdbdffaf01aea376ba08",
+      "rows": 139
+    }
+  ]
+}

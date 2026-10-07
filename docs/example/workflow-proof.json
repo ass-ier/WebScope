@@ -1,0 +1,255 @@
+{
+  "observed_at": "2026-10-07T19:42:01.226Z",
+  "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+  "finding_id": "e919d8fd-0851-400d-86da-dc922ad108b8",
+  "evidence_id": "06ccc625-4223-4d47-9d73-3314144dd19b",
+  "capture_id": "2d374e7a-f993-46bb-ba5f-259f95ab3885",
+  "case_id": "faa5870c-73a0-4c96-bd30-c09d8d6588ce",
+  "counts": {
+    "hosts": 1,
+    "technologies": 3,
+    "transactions": 12,
+    "evidence": 139,
+    "cases": 1,
+    "endpoints": 22,
+    "findings": 44,
+    "apis": 5
+  },
+  "severity_counts": {
+    "INFO": 22,
+    "LOW": 15,
+    "MEDIUM": 5,
+    "HIGH": 2,
+    "CRITICAL": 0
+  },
+  "graph_nodes": 72,
+  "graph_edges": 84,
+  "actual_fixture_requests": [
+    "/",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/login",
+    "/api/users",
+    "/verbose",
+    "/redirect-blocked",
+    "/assets/react.production.js",
+    "/.env",
+    "/.git/",
+    "/debug",
+    "/cors",
+    "/fixture-requests",
+    "/fixture-requests",
+    "/fixture-requests"
+  ],
+  "network_attempts": [
+    {
+      "id": "0ba20cd4-c7f4-4063-a88d-7f2398ed5f02",
+      "created_at": "2026-10-07T19:41:47.400583+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/",
+        "operation": "HTTP_GET",
+        "request_number": 1,
+        "elapsed_seconds": 0.0016
+      }
+    },
+    {
+      "id": "801d0a27-5bef-491a-94bf-7dcc51261835",
+      "created_at": "2026-10-07T19:41:47.501254+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/robots.txt",
+        "operation": "HTTP_GET",
+        "request_number": 2,
+        "elapsed_seconds": 0.1021
+      }
+    },
+    {
+      "id": "15a9f459-e7cc-4a85-bc73-69b50f57884c",
+      "created_at": "2026-10-07T19:41:47.601280+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/sitemap.xml",
+        "operation": "HTTP_GET",
+        "request_number": 3,
+        "elapsed_seconds": 0.2021
+      }
+    },
+    {
+      "id": "d2ad9d64-8094-4169-927d-bf1bac9cfd97",
+      "created_at": "2026-10-07T19:41:47.703347+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/login",
+        "operation": "HTTP_GET",
+        "request_number": 4,
+        "elapsed_seconds": 0.3041
+      }
+    },
+    {
+      "id": "6d7e4c7a-f0cb-445f-ab2f-8883d6ab0e29",
+      "created_at": "2026-10-07T19:41:47.805898+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/api/users",
+        "operation": "HTTP_GET",
+        "request_number": 5,
+        "elapsed_seconds": 0.4063
+      }
+    },
+    {
+      "id": "aae860ae-7177-40b1-ab1b-1263fe6d4b75",
+      "created_at": "2026-10-07T19:41:47.908943+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/verbose",
+        "operation": "HTTP_GET",
+        "request_number": 6,
+        "elapsed_seconds": 0.5085
+      }
+    },
+    {
+      "id": "7ba7a3b8-cb51-48d4-bab4-e4fc053e6215",
+      "created_at": "2026-10-07T19:41:48.011019+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/redirect-blocked",
+        "operation": "HTTP_GET",
+        "request_number": 7,
+        "elapsed_seconds": 0.6107
+      }
+    },
+    {
+      "id": "c9b0e151-77d4-43d3-9ec3-f1df97f77d37",
+      "created_at": "2026-10-07T19:41:48.114474+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/assets/react.production.js",
+        "operation": "HTTP_GET",
+        "request_number": 8,
+        "elapsed_seconds": 0.7129
+      }
+    },
+    {
+      "id": "d0cc106f-b71a-40d9-8d95-b20b1de32b66",
+      "created_at": "2026-10-07T19:41:48.551312+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/.env",
+        "operation": "HTTP_GET",
+        "request_number": 1,
+        "elapsed_seconds": 0.0013
+      }
+    },
+    {
+      "id": "0847e6fd-abba-44ec-9973-76d3e25fee6a",
+      "created_at": "2026-10-07T19:41:48.653164+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/.git/",
+        "operation": "HTTP_GET",
+        "request_number": 2,
+        "elapsed_seconds": 0.1027
+      }
+    },
+    {
+      "id": "2e7c2745-992b-45e4-aff7-fad0980f82b5",
+      "created_at": "2026-10-07T19:41:48.755258+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/debug",
+        "operation": "HTTP_GET",
+        "request_number": 3,
+        "elapsed_seconds": 0.2047
+      }
+    },
+    {
+      "id": "1b554aa7-7989-489c-a33f-c76a1e9a826e",
+      "created_at": "2026-10-07T19:41:48.857383+00:00",
+      "assessment_id": "e470520c-03be-4dd7-97d6-28a5f2e8a9f3",
+      "event": "NETWORK_ATTEMPT",
+      "message": "HTTP_GET authorized by central policy",
+      "data": {
+        "url": "http://127.0.0.1:9998/cors",
+        "operation": "HTTP_GET",
+        "request_number": 4,
+        "elapsed_seconds": 0.3069
+      }
+    }
+  ],
+  "exports": [
+    {
+      "format": "markdown",
+      "dataset": "assessment",
+      "id": "4e4162de-48a3-4100-a51f-b83fb57df1ff",
+      "filename": "webscope-e470520c-assessment.md",
+      "artifact": "assessment.md"
+    },
+    {
+      "format": "json",
+      "dataset": "assessment",
+      "id": "ce3c0db6-983c-4215-8e7e-564458b8618a",
+      "filename": "webscope-e470520c-assessment.json",
+      "artifact": "assessment.json"
+    },
+    {
+      "format": "pdf",
+      "dataset": "assessment",
+      "id": "5d8df266-1a0c-4486-b3ea-7878f27943d8",
+      "filename": "webscope-e470520c-assessment.pdf",
+      "artifact": "assessment.pdf"
+    },
+    {
+      "format": "csv",
+      "dataset": "endpoints",
+      "id": "9a645a7d-0259-455d-9941-78357f1874d8",
+      "filename": "webscope-e470520c-endpoints.csv",
+      "artifact": "endpoints.csv"
+    },
+    {
+      "format": "csv",
+      "dataset": "findings",
+      "id": "3c3f83d3-0421-404d-a8ad-130f3e509e9f",
+      "filename": "webscope-e470520c-findings.csv",
+      "artifact": "findings.csv"
+    },
+    {
+      "format": "csv",
+      "dataset": "technologies",
+      "id": "b65efbc5-32c3-4ea7-8879-e92f7c5f9fc7",
+      "filename": "webscope-e470520c-technologies.csv",
+      "artifact": "technologies.csv"
+    },
+    {
+      "format": "csv",
+      "dataset": "evidence",
+      "id": "b6352032-5f7b-4995-ae34-7cbdebefa042",
+      "filename": "webscope-e470520c-evidence.csv",
+      "artifact": "evidence.csv"
+    }
+  ],
+  "page_errors": [],
+  "fixture_only": true
+}

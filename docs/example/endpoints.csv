@@ -1,0 +1,23 @@
+﻿id,url,method,parameters,content_type,authentication,source,evidence_id,in_scope
+eefd4da9-d67e-4ceb-b50b-106f62a47655,http://127.0.0.1:9998/,GET,[],text/html; charset=utf-8,NOT_CHALLENGED,HTTP,fec969bb-c018-44a4-9ea2-811b93f94712,True
+63d3ad51-0d84-4006-9510-1298f0e797a8,http://127.0.0.1:9998/login,GET,[],text/html; charset=utf-8,NOT_CHALLENGED,HTML,5c0279ed-81fe-4f6b-b498-18c0af431558,True
+2f868bd9-1c9a-450a-96cc-a2c99fd7072e,http://127.0.0.1:9998/api/users,GET,[],application/json,NOT_CHALLENGED,HTML,5c0279ed-81fe-4f6b-b498-18c0af431558,True
+28982931-3fb3-45b5-bcb0-fe4fa79792c9,http://127.0.0.1:9998/verbose,GET,[],text/plain; charset=utf-8,NOT_CHALLENGED,HTML,5c0279ed-81fe-4f6b-b498-18c0af431558,True
+5c66af4b-9b14-4c97-816d-629e0e3a0d33,http://127.0.0.1:9998/redirect-blocked,GET,[],,NOT_CHALLENGED,HTML,5c0279ed-81fe-4f6b-b498-18c0af431558,True
+9a246530-b66b-4044-a706-8a240a1f882f,http://127.0.0.1:9998/admin/private,GET,[],,UNKNOWN,HTML,5c0279ed-81fe-4f6b-b498-18c0af431558,False
+e6a746b7-da7e-4f68-83cd-b84643a6724f,https://outside.invalid/resource,GET,[],,UNKNOWN,HTML,5c0279ed-81fe-4f6b-b498-18c0af431558,False
+54ddf0d7-3139-4396-a197-73ec8867b3fa,http://127.0.0.1:9998/session,POST,"[{""name"": ""username"", ""in"": ""body"", ""type"": ""text""}, {""name"": ""password"", ""in"": ""body"", ""type"": ""text""}]",,UNKNOWN,FORM,5c0279ed-81fe-4f6b-b498-18c0af431558,True
+30339f4d-98f9-4e5e-bed2-f29668634cab,http://127.0.0.1:9998/assets/react.production.js,GET,[],application/javascript,NOT_CHALLENGED,HTML,5c0279ed-81fe-4f6b-b498-18c0af431558,True
+683bfd36-96ee-45f9-b951-ec37ad8cec26,http://127.0.0.1:9998/robots.txt,GET,[],text/plain; charset=utf-8,NOT_CHALLENGED,HTTP,03a211a7-c7c2-4076-80ba-8261360f302a,True
+581e9ee9-0cd6-4b32-9c18-2fea8e33cd33,http://127.0.0.1:9998/api/docs,GET,[],,UNKNOWN,ROBOTS,03a211a7-c7c2-4076-80ba-8261360f302a,True
+b6f303a7-1beb-4f12-bc5f-9a187de0fb17,http://127.0.0.1:9998/sitemap.xml,GET,[],application/xml,NOT_CHALLENGED,HTTP,aa18999f-3222-43c4-a2af-b1bb1485cd6d,True
+3e4dbe6c-203b-4199-a5b6-1e0c895c169f,http://127.0.0.1:9998/catalog,GET,[],,UNKNOWN,SITEMAP,aa18999f-3222-43c4-a2af-b1bb1485cd6d,True
+2c157415-baad-4211-a8cd-c64794423efd,http://127.0.0.1:9998/api/profile,GET,[],,UNKNOWN,JAVASCRIPT,03466307-9ad2-433b-a487-abb782f9bb6a,True
+6359e4eb-b71b-4c09-a80b-3a26333e892e,http://127.0.0.1:9998/assets/app.js.map,GET,[],,UNKNOWN,JAVASCRIPT,03466307-9ad2-433b-a487-abb782f9bb6a,True
+86ead582-eeed-4965-87db-98e4e20181a6,http://127.0.0.1:9998/.env,GET,[],text/plain; charset=utf-8,NOT_CHALLENGED,HTTP,9ce79b33-4360-4309-9db0-f569e489a2d4,True
+2c7a732a-1c35-4ab1-b2b5-ed5aa52000b4,http://127.0.0.1:9998/.git/,GET,[],text/plain; charset=utf-8,NOT_CHALLENGED,HTTP,ca70165b-385e-4cb3-bcf5-46dbc61d1be8,True
+fe4450ed-14ee-4ce9-ac0e-2fcde6eea809,http://127.0.0.1:9998/debug,GET,[],text/html; charset=utf-8,NOT_CHALLENGED,HTTP,555011e6-5d6d-43b6-8030-06317d643d3e,True
+0ad4759e-2047-4a9b-a33f-5821f6f65d24,http://127.0.0.1:9998/cors,GET,[],application/json,NOT_CHALLENGED,HTTP,06ccc625-4223-4d47-9d73-3314144dd19b,True
+4cb96feb-864d-4582-ad1b-824f39d63716,http://127.0.0.1:9998/manual-inventory,POST,"[{""name"": ""filter"", ""in"": ""body"", ""type"": ""string""}]",,UNKNOWN,MANUAL,deb84e15-fc39-4ea1-82d7-b319ef378328,True
+72e221fc-80fd-45b3-bd8c-ef6c5fa833da,http://127.0.0.1:9998/api/orders,GET,"[{""name"": ""limit"", ""in"": ""query"", ""schema"": {""type"": ""integer""}}]",,DECLARED_REQUIRED,OPENAPI,d76959f6-69b6-4e65-bc28-d1e0831ea81a,True
+2af5d264-46c3-44b5-acc5-069e7f6e7f28,http://127.0.0.1:9998/api/orders,POST,[],,DECLARED_REQUIRED,OPENAPI,d76959f6-69b6-4e65-bc28-d1e0831ea81a,True

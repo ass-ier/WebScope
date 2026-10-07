@@ -1,0 +1,15 @@
+
+> webscope-frontend@1.0.0 build
+> tsc -b && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 1808 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                           1.20 kB │ gzip:   0.71 kB
+dist/assets/AttackSurface-BnuhLJ6X.css   15.87 kB │ gzip:   2.67 kB
+dist/assets/index-cx00EuTo.css           33.37 kB │ gzip:   8.36 kB
+dist/assets/AttackSurface-B9HmPIz1.js   186.49 kB │ gzip:  61.43 kB
+dist/assets/index-C3ygROkk.js           395.05 kB │ gzip: 120.61 kB
+✓ built in 2.12s

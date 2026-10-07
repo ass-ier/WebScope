@@ -1,0 +1,5 @@
+No new upgrade operations detected.
+Revision: 0003
+Integrity: ok
+Foreign key violations: []
+Tables: 24

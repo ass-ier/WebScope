@@ -1,0 +1,4 @@
+﻿id,name,category,version,confidence,rationale,evidence_id
+5cdffdc6-8bbe-4eef-a41f-750483722cae,Express,Backend,,MEDIUM,Self-reported HTTP banner contains Express; banners can be spoofed,c1f2f991-a0a5-41b7-adaf-d403358ae72f
+de6972df-9b5a-435e-8c6c-b89b263e30b7,React,Frontend,,MEDIUM,Observed markup/asset marker: react.production.js,4bf6e234-946c-4f6b-94f5-deb031698e9d
+87fe84e6-4723-4294-bdcc-0bbcd675d8ad,WebScope Fixture,CMS,,LOW,Self-reported generator metadata,e42a992f-70a6-4413-9197-f3ffcf6d6eb4

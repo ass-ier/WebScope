@@ -1,0 +1,5 @@
+*.pdf binary
+# Preserve exact exported bytes and intentional Markdown hard line breaks.
+docs/example/*.csv -text whitespace=cr-at-eol
+docs/example/assessment.md whitespace=-blank-at-eol
+docs/verification-logs/*.txt whitespace=-blank-at-eol,-blank-at-eof
