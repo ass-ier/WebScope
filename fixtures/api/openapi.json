@@ -1,0 +1,20 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "WebScope synthetic API", "version": "1.0"},
+  "servers": [{"url": "/"}],
+  "security": [{"sessionAuth": []}],
+  "paths": {
+    "/api/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "parameters": [{"$ref": "#/components/parameters/Limit"}],
+        "responses": {"200": {"description": "Synthetic list", "content": {"application/json": {"schema": {"type": "array", "items": {"type": "object"}}}}}}
+      },
+      "post": {"operationId": "createOrderInventoryOnly", "responses": {"201": {"description": "Never executed"}}}
+    }
+  },
+  "components": {
+    "parameters": {"Limit": {"name": "limit", "in": "query", "schema": {"type": "integer"}}},
+    "securitySchemes": {"sessionAuth": {"type": "apiKey", "in": "cookie", "name": "session"}}
+  }
+}
